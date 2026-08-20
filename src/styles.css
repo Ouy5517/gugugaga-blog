@@ -2,6 +2,7 @@
 
 :root { --iris:#847dff; --cyan:#00b3dd; --orchid:#dd90d8; --periwinkle:#90b8f0; --obsidian:#0f1011; --abyss:#090a0b; --graphite:#2e2e2e; --steel:#3f4041; --silver:#cacaca; --ash:#9f9fa0; --cloud:#f5f5f7; --pure:#fff; --void:#000; --display:"Noto Serif SC","Songti SC",serif; --sans:"Inter","PingFang SC","Microsoft YaHei",sans-serif; --mono:"Roboto Mono",monospace; }
 * { box-sizing:border-box; }
+img { display:block; max-width:100%; }
 html { scroll-behavior:smooth; background:var(--obsidian); }
 body { margin:0; min-width:320px; min-height:100vh; color:var(--cloud); background:var(--obsidian); font-family:var(--sans); -webkit-font-smoothing:antialiased; }
 button,input { font:inherit; } button { color:inherit; }
@@ -113,7 +114,8 @@ footer button:hover { color:var(--pure); }
   .site-header { grid-template-columns:1fr auto; } .subscribe-nav { display:none; } .menu-toggle { display:grid; place-items:center; }
   .nav-links { position:absolute; left:12px; right:12px; top:calc(100% + 10px); display:none; flex-direction:column; padding:12px; border:1px solid rgba(255,255,255,.18); border-radius:16px; background:rgba(15,16,17,.92); backdrop-filter:blur(24px); }
   .nav-links.is-open { display:flex; } .nav-links button { text-align:left; }
-  .post-grid { grid-template-columns:1fr; } .post-card { display:grid; grid-template-columns:42% 1fr; } .post-image-wrap { height:100%; min-height:280px; }
+  .post-grid { grid-template-columns:1fr; } .post-card { display:block; min-width:0; } .post-image-wrap { height:220px; min-height:0; }
+  .post-card-hit .post-content { min-height:0; }
   .project-card { padding:30px; }
   .subscribe-section { grid-template-columns:1fr; gap:28px; }
 }
@@ -153,7 +155,7 @@ footer button:hover { color:var(--pure); }
 .library-results .section-heading { margin-bottom:26px; }
 .library-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; }
 .library-card { min-width:0; }
-.post-card-hit { display:block; width:100%; height:100%; padding:0; border:0; color:inherit; text-align:left; background:transparent; cursor:pointer; }
+.post-card-hit { display:block; width:100%; min-width:0; height:100%; padding:0; border:0; color:inherit; text-align:left; background:transparent; cursor:pointer; }
 .post-card-hit:focus-visible { outline:2px solid var(--periwinkle); outline-offset:-2px; border-radius:inherit; }
 .post-card-hit .post-content { min-height:255px; }
 .card-read { display:inline-flex; align-items:center; gap:9px; color:var(--cloud); transition:gap .2s ease,color .2s ease; }
