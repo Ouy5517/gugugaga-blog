@@ -28,10 +28,15 @@ function parseMarkdown(raw) {
 
 const postModules = import.meta.glob("./posts/*.md", { eager: true, query: "?raw", import: "default" });
 const projectModules = import.meta.glob("./projects/*.md", { eager: true, query: "?raw", import: "default" });
+const categoryImages = {
+  "技术实践": "/assets/categories/technical-practice.png",
+  "经验分享": "/assets/categories/experience-sharing.png",
+  "杂项": "/assets/categories/miscellaneous.png",
+};
 
 export const posts = Object.values(postModules).map((raw) => {
   const { meta, body } = parseMarkdown(raw);
-  return { ...meta, body, tags: meta.tags || [], readingTime: Number(meta.readingTime || 1) };
+  return { ...meta, image: meta.image || categoryImages[meta.category] || categoryImages["杂项"], body, tags: meta.tags || [], readingTime: Number(meta.readingTime || 1) };
 }).filter((post) => !post.draft).sort((a, b) => b.date.localeCompare(a.date));
 
 export const projects = Object.values(projectModules).map((raw) => {
@@ -39,7 +44,7 @@ export const projects = Object.values(projectModules).map((raw) => {
   return { ...meta, body, stack: meta.stack || [] };
 }).filter((project) => !project.draft);
 
-export const categories = ["全部", ...new Set(posts.map((post) => post.category))];
+export const categories = ["全部", "技术实践", "经验分享", "杂项"];
 export const tags = ["全部", ...new Set(posts.flatMap((post) => post.tags))];
 
 export function findPost(slug) {

@@ -23,10 +23,10 @@ collections:
       - { label: Slug, name: slug, widget: string, hint: "只使用小写英文、数字和连字符。" }
       - { label: 标题, name: title, widget: string }
       - { label: 发布日期, name: date, widget: datetime, format: "YYYY.MM.DD", date_format: "YYYY.MM.DD", time_format: false }
-      - { label: 分类, name: category, widget: string }
+      - { label: 分类, name: category, widget: select, options: ["技术实践", "经验分享", "杂项"], default: "技术实践" }
       - { label: 标签, name: tags, widget: list, required: false }
       - { label: 摘要, name: excerpt, widget: text }
-      - { label: 封面图, name: image, widget: image, required: false, default: "/assets/card-periwinkle.png" }
+      - { label: 封面图, name: image, widget: image, required: false, hint: "留空时会根据分类自动使用对应分类封面。" }
       - { label: 阅读时长, name: readingTime, widget: number, value_type: int, min: 1, default: 8 }
       - { label: 草稿, name: draft, widget: boolean, default: false, required: false }
       - { label: 正文, name: body, widget: markdown, hint: "支持 GFM、代码块和 KaTeX；块级公式请让 $$ 各自单独成行。" }

@@ -56,7 +56,7 @@ Netlify 根据 GitHub commit 自动部署
 blog-site/
 ├─ public/
 │  ├─ admin/                       Decap CMS 页面和配置
-│  ├─ assets/                      首页、文章封面和关于页面图片
+│  ├─ assets/                      首页背景、分类封面、文章媒体资源
 │  ├─ _redirects                   SPA 路由刷新回退规则
 │  ├─ feed.xml                     构建生成的 RSS
 │  ├─ robots.txt                   构建生成的抓取规则
@@ -123,6 +123,14 @@ ArticleLibrary 使用 useMemo 对文章做派生计算：
 - 按标签筛选。
 - 按年份生成归档分组。
 - 使用文章 slug 跳转到详情页。
+
+当前文章分类统一为三类：
+
+- **技术实践**：前端实验、内容工程、机器人和强化学习等可复现的实现过程。
+- **经验分享**：写作规范、学习方法和工程复盘等总结性内容。
+- **杂项**：课程笔记和暂时无法归入前两类的探索记录。
+
+分类封面位于 `public/assets/categories/`，新增文章时可以直接复用对应分类图片。
 
 搜索框还监听 Ctrl + K、⌘ + K 和 /，方便在文章较多时快速定位内容。
 
@@ -249,13 +257,13 @@ npm run sync:github
 ---
 slug: tcp-notes
 date: 2026.09.01
-category: 计算机网络
+category: 技术实践
 tags:
   - TCP
   - 课程笔记
 title: TCP 拥塞控制学习笔记
 excerpt: 记录慢启动、拥塞避免和快速重传的核心思路。
-image: /assets/card-periwinkle.png
+image: /assets/categories/technical-practice.png
 readingTime: 8
 draft: false
 ---
@@ -275,7 +283,7 @@ draft: false
 | tags | 标签数组 |
 | title | 文章标题 |
 | excerpt | 首页和索引页摘要 |
-| image | 必须从 /assets/ 开始 |
+| image | 可选，必须从 /assets/ 开始；留空时按分类自动使用对应封面 |
 | readingTime | 阅读时间，单位为分钟 |
 | draft | true 时不会进入页面和 RSS |
 
@@ -308,10 +316,10 @@ githubSync: false
 将图片放入 public/assets/，Front Matter 使用：
 
 ~~~yaml
-image: /assets/tcp-notes.png
+image: /assets/categories/technical-practice.png
 ~~~
 
-不要写成 public/assets/tcp-notes.png。图片建议使用小写英文和连字符命名，并在提交前压缩体积。
+不要写成 public/assets/tcp-notes.png。站点现有背景图位于 `public/assets/backgrounds/`，分类封面位于 `public/assets/categories/`。图片建议使用小写英文和连字符命名，并在提交前压缩体积。
 
 ## 六、本地开发和验证
 

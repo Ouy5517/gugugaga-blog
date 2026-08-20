@@ -1,14 +1,14 @@
 ---
 slug: markdown-writing-guide
 date: 2026.08.20
-category: 工程实践
+category: 经验分享
 tags:
   - Markdown
   - 内容管理
   - 写作规范
 title: Markdown 文件编写规则：从 Front Matter 到技术文章结构
 excerpt: 介绍本博客中 Markdown 文件的编写规则，包括文件命名、Front Matter、标题层级、代码块、图片路径和发布检查。
-image: /assets/card-violet.png
+image: /assets/categories/experience-sharing.png
 readingTime: 10
 draft: false
 ---

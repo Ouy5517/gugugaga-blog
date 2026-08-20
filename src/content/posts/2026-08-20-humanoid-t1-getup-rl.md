@@ -1,7 +1,7 @@
 ---
 slug: humanoid-t1-getup-rl
 date: 2026.08.20
-category: 强化学习
+category: 技术实践
 tags:
   - 人形机器人
   - 强化学习
@@ -10,7 +10,7 @@ tags:
   - mjlab
 title: 重塑跌倒恢复：基于 GPU 并行物理仿真与外力课程的人形机器人全向强化学习起身实践
 excerpt: 系统解构基于 GPU 并行物理仿真的人形机器人全向起身方案，覆盖接触求解、沉降窗口、外力课程、锚点环境、乘法奖励和恢复状态机。
-image: /assets/card-periwinkle.png
+image: /assets/categories/technical-practice.png
 trainingVideo: /assets/videos/getup-training-process.mp4
 resultVideo: /assets/videos/getup-training-result.mp4
 readingTime: 24
