@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>咕咕嘎嘎的个人博客</title>
+    <link>http://localhost:5173</link>
+    <description>分享计算机学习、技术文章与个人项目。</description>
+    <language>zh-CN</language>
+    <lastBuildDate>Wed, 19 Aug 2026 16:00:00 GMT</lastBuildDate>
+    <item>
+      <title>重塑跌倒恢复：基于 GPU 并行物理仿真与外力课程的人形机器人全向强化学习起身实践</title>
+      <link>http://localhost:5173/articles/humanoid-t1-getup-rl</link>
+      <guid isPermaLink="true">http://localhost:5173/articles/humanoid-t1-getup-rl</guid>
+      <description>系统解构基于 GPU 并行物理仿真的人形机器人全向起身方案，覆盖接触求解、沉降窗口、外力课程、锚点环境、乘法奖励和恢复状态机。</description>
+      <pubDate>Wed, 19 Aug 2026 16:00:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>Markdown 文件编写规则：从 Front Matter 到技术文章结构</title>
+      <link>http://localhost:5173/articles/markdown-writing-guide</link>
+      <guid isPermaLink="true">http://localhost:5173/articles/markdown-writing-guide</guid>
+      <description>介绍本博客中 Markdown 文件的编写规则，包括文件命名、Front Matter、标题层级、代码块、图片路径和发布检查。</description>
+      <pubDate>Wed, 19 Aug 2026 16:00:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>从滚动视频到组件边界：一次前端实验的拆解</title>
+      <link>http://localhost:5173/articles/scroll-video-frontend</link>
+      <guid isPermaLink="true">http://localhost:5173/articles/scroll-video-frontend</guid>
+      <description>记录一个滚动视频可视化页面如何拆分为可维护的 React 组件，并复盘交互、性能和响应式布局的取舍。</description>
+      <pubDate>Sat, 15 Aug 2026 16:00:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>用 TypeScript 约束内容数据：给个人博客加一层类型安全</title>
+      <link>http://localhost:5173/articles/typed-content-model</link>
+      <guid isPermaLink="true">http://localhost:5173/articles/typed-content-model</guid>
+      <description>把文章和项目从 JSX 中抽离出来，用统一的数据结构管理标题、标签、封面和发布状态。</description>
+      <pubDate>Sat, 08 Aug 2026 16:00:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>TCP 拥塞控制：从慢启动到拥塞避免</title>
+      <link>http://localhost:5173/articles/tcp-congestion-control</link>
+      <guid isPermaLink="true">http://localhost:5173/articles/tcp-congestion-control</guid>
+      <description>用一张时间线梳理慢启动、拥塞避免、快速重传和快速恢复之间的关系。</description>
+      <pubDate>Sat, 01 Aug 2026 16:00:00 GMT</pubDate>
+    </item>
+  </channel>
+</rss>

@@ -1,0 +1,54 @@
+backend:
+  name: git-gateway
+  branch: main
+
+local_backend: true
+publish_mode: editorial_workflow
+media_folder: public/assets
+public_folder: /assets
+locale: zh_Hans
+
+collections:
+  - name: posts
+    label: 技术文章
+    label_singular: 技术文章
+    folder: src/content/posts
+    create: true
+    extension: md
+    format: frontmatter
+    identifier_field: slug
+    slug: "{{year}}-{{month}}-{{day}}-{{slug}}"
+    summary: "{{date}} · {{category}} · {{title}}"
+    fields:
+      - { label: Slug, name: slug, widget: string, hint: "只使用小写英文、数字和连字符。" }
+      - { label: 标题, name: title, widget: string }
+      - { label: 发布日期, name: date, widget: datetime, format: "YYYY.MM.DD", date_format: "YYYY.MM.DD", time_format: false }
+      - { label: 分类, name: category, widget: string }
+      - { label: 标签, name: tags, widget: list, required: false }
+      - { label: 摘要, name: excerpt, widget: text }
+      - { label: 封面图, name: image, widget: image, required: false, default: "/assets/card-periwinkle.png" }
+      - { label: 阅读时长, name: readingTime, widget: number, value_type: int, min: 1, default: 8 }
+      - { label: 草稿, name: draft, widget: boolean, default: false, required: false }
+      - { label: 正文, name: body, widget: markdown, hint: "支持 GFM、代码块和 KaTeX；块级公式请让 $$ 各自单独成行。" }
+
+  - name: projects
+    label: 项目
+    label_singular: 项目
+    folder: src/content/projects
+    create: true
+    extension: md
+    format: frontmatter
+    identifier_field: name
+    slug: "{{slug}}"
+    summary: "{{status}} · {{title}}"
+    fields:
+      - { label: 项目名, name: name, widget: string }
+      - { label: 标题, name: title, widget: string }
+      - { label: 简介, name: description, widget: text }
+      - { label: 详情, name: detail, widget: text }
+      - { label: 技术栈, name: stack, widget: list }
+      - { label: 仓库地址, name: url, widget: string }
+      - { label: 状态, name: status, widget: string, default: 进行中 }
+      - { label: GitHub 自动同步, name: githubSync, widget: boolean, default: false, required: false }
+      - { label: 精选项目, name: featured, widget: boolean, default: false, required: false }
+      - { label: 项目补充说明, name: body, widget: markdown, required: false }

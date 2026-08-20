@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>http://localhost:5173/</loc></url>
+  <url><loc>http://localhost:5173/articles</loc></url>
+  <url><loc>http://localhost:5173/articles/humanoid-t1-getup-rl</loc></url>
+  <url><loc>http://localhost:5173/articles/markdown-writing-guide</loc></url>
+  <url><loc>http://localhost:5173/articles/scroll-video-frontend</loc></url>
+  <url><loc>http://localhost:5173/articles/typed-content-model</loc></url>
+  <url><loc>http://localhost:5173/articles/tcp-congestion-control</loc></url>
+</urlset>
