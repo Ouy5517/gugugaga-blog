@@ -8,7 +8,7 @@ tags:
   - 课程笔记
 title: TCP 拥塞控制：从慢启动到拥塞避免
 excerpt: 用一张时间线梳理慢启动、拥塞避免、快速重传和快速恢复之间的关系。
-image: /assets/categories/miscellaneous.png
+image: /assets/card-orchid.png
 readingTime: 8
 draft: false
 ---

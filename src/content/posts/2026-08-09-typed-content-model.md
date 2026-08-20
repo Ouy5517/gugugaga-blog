@@ -8,7 +8,7 @@ tags:
   - Vite
 title: 用 TypeScript 约束内容数据：给个人博客加一层类型安全
 excerpt: 把文章和项目从 JSX 中抽离出来，用统一的数据结构管理标题、标签、封面和发布状态。
-image: /assets/categories/technical-practice.png
+image: /assets/card-periwinkle.png
 readingTime: 5
 draft: false
 ---

@@ -130,7 +130,7 @@ ArticleLibrary 使用 useMemo 对文章做派生计算：
 - **经验分享**：写作规范、学习方法和工程复盘等总结性内容。
 - **杂项**：课程笔记和暂时无法归入前两类的探索记录。
 
-分类封面位于 `public/assets/categories/`，新增文章时可以直接复用对应分类图片。
+分类默认封面直接复用初始资源：技术实践使用 `card-periwinkle.png`，经验分享使用 `card-violet.png`，杂项使用 `card-orchid.png`。
 
 搜索框还监听 Ctrl + K、⌘ + K 和 /，方便在文章较多时快速定位内容。
 
@@ -263,7 +263,7 @@ tags:
   - 课程笔记
 title: TCP 拥塞控制学习笔记
 excerpt: 记录慢启动、拥塞避免和快速重传的核心思路。
-image: /assets/categories/technical-practice.png
+image: /assets/card-periwinkle.png
 readingTime: 8
 draft: false
 ---
@@ -316,10 +316,10 @@ githubSync: false
 将图片放入 public/assets/，Front Matter 使用：
 
 ~~~yaml
-image: /assets/categories/technical-practice.png
+image: /assets/card-periwinkle.png
 ~~~
 
-不要写成 public/assets/tcp-notes.png。站点现有背景图位于 `public/assets/backgrounds/`，分类封面位于 `public/assets/categories/`。图片建议使用小写英文和连字符命名，并在提交前压缩体积。
+不要写成 public/assets/tcp-notes.png。站点首页背景使用 `hero-mountain.png`，关于区域使用 `about-forest.png`。图片建议使用小写英文和连字符命名，并在提交前压缩体积。
 
 ## 六、本地开发和验证
 

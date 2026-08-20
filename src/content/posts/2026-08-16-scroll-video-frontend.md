@@ -8,7 +8,7 @@ tags:
   - 前端实践
 title: 从滚动视频到组件边界：一次前端实验的拆解
 excerpt: 记录一个滚动视频可视化页面如何拆分为可维护的 React 组件，并复盘交互、性能和响应式布局的取舍。
-image: /assets/categories/technical-practice.png
+image: /assets/card-periwinkle.png
 readingTime: 7
 draft: false
 ---

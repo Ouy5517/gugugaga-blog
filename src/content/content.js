@@ -29,9 +29,9 @@ function parseMarkdown(raw) {
 const postModules = import.meta.glob("./posts/*.md", { eager: true, query: "?raw", import: "default" });
 const projectModules = import.meta.glob("./projects/*.md", { eager: true, query: "?raw", import: "default" });
 const categoryImages = {
-  "技术实践": "/assets/categories/technical-practice.png",
-  "经验分享": "/assets/categories/experience-sharing.png",
-  "杂项": "/assets/categories/miscellaneous.png",
+  "技术实践": "/assets/card-periwinkle.png",
+  "经验分享": "/assets/card-violet.png",
+  "杂项": "/assets/card-orchid.png",
 };
 
 export const posts = Object.values(postModules).map((raw) => {
