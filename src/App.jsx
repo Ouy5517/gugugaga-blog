@@ -169,6 +169,48 @@ function TableOfContents({ post }) {
   </aside>;
 }
 
+function ArticleVideos({ post }) {
+  const videos = [
+    post.trainingVideo && {
+      label: "训练过程",
+      title: "外力课程与起身策略训练",
+      description: "记录策略在 GPU 并行仿真中的训练过程，观察起身动作从探索到稳定收敛的变化。",
+      src: post.trainingVideo,
+    },
+    post.resultVideo && {
+      label: "训练结果",
+      title: "全向跌倒恢复训练结果",
+      description: "展示当前策略在不同跌倒姿态与扰动下的自主起身效果。",
+      src: post.resultVideo,
+    },
+  ].filter(Boolean);
+
+  if (!videos.length) return null;
+
+  return <section className="article-media" aria-label="文章视频演示">
+    <div className="article-media-heading">
+      <p className="eyebrow">SIMULATION PLAYBACK</p>
+      <h2>训练过程与结果</h2>
+      <p>用两个视频快速了解策略如何训练，以及当前阶段能够达到的恢复效果。</p>
+    </div>
+    <div className="article-video-grid">
+      {videos.map((video) => <figure className="article-video-card" key={video.src}>
+        <div className="article-video-frame">
+          <video controls preload="metadata" playsInline>
+            <source src={video.src} type="video/mp4" />
+            你的浏览器暂不支持 HTML5 视频播放。
+          </video>
+        </div>
+        <figcaption>
+          <p className="article-video-label">{video.label}</p>
+          <strong>{video.title}</strong>
+          <p>{video.description}</p>
+        </figcaption>
+      </figure>)}
+    </div>
+  </section>;
+}
+
 function ArticleCard({ post, onNavigate }) {
   return <article className="post-card library-card">
     <button type="button" className="post-card-hit" onClick={() => onNavigate(`/articles/${post.slug}`)} aria-label={`阅读：${post.title}`}>
@@ -229,6 +271,7 @@ function ArticlePage({ post, onNavigate }) {
       <button className="back-link" type="button" onClick={() => onNavigate("/articles")}><ArrowLeft size={17} /> 返回文章索引</button>
       <header className="article-header"><p className="eyebrow">{post.category} · TECH NOTE</p><h1>{post.title}</h1><p className="article-lede">{post.excerpt}</p><div className="article-meta"><span>{post.date}</span><span><Clock size={15} /> {post.readingTime} 分钟阅读</span><span>{post.tags.join(" · ")}</span></div></header>
       <img className="article-cover" src={post.image} alt="文章封面" />
+      <ArticleVideos post={post} />
       <div className="article-layout"><article><MarkdownArticle body={post.body} /></article><TableOfContents post={post} /></div>
       <nav className="article-neighbors" aria-label="相邻文章">{previous ? <button type="button" onClick={() => onNavigate(`/articles/${previous.slug}`)}><span>上一篇</span><strong>{previous.title}</strong></button> : <span />}{next ? <button type="button" onClick={() => onNavigate(`/articles/${next.slug}`)}><span>下一篇</span><strong>{next.title}</strong></button> : <span />}</nav>
     </div>
