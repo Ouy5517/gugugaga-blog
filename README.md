@@ -1,86 +1,251 @@
 # 咕咕嘎嘎的个人博客
 
-这是一个使用 React、Vite 和 Markdown 内容文件构建的个人技术博客，支持文章详情、分类、标签、搜索、归档、目录和代码复制。
+这是一个面向计算机科学本科生的个人技术博客，主要记录计算机基础学习、技术文章和个人项目。
 
-博客作者：咕咕嘎嘎（[GitHub/Ouy5517](https://github.com/Ouy5517)）。
+- 博客作者：咕咕嘎嘎
+- GitHub：<https://github.com/Ouy5517>
+- 当前仓库：<https://github.com/Ouy5517/gugugaga-blog>
+- 示例项目：<https://github.com/Ouy5517/vibe-coding-web-frontend-test>
 
-## 运行项目
+项目不是把文章写死在 JSX 里的页面，而是把 Markdown 文件作为内容源，再由 React 在构建时加载、解析和渲染。新增文章或项目时只需要增加一个内容文件，不需要反复修改页面组件。
 
-```powershell
-cd C:\Users\14564\Desktop\web_blog\blog-site
-npm install
-npm run dev
-```
+## 一、项目实现路线
 
-## 部署成正式网站
+整个项目按下面的链路实现：
 
-当前项目是 Vite 单页应用，推荐使用 Netlify：它能自动监听 GitHub 提交、部署 `dist`，并且和当前 Decap CMS 的 Git Gateway 配置直接匹配。Netlify 对 Vite 项目的常用设置是 `npm run build` 和 `dist` 发布目录（[官方说明](https://docs.netlify.com/build/frameworks/framework-setup-guides/vite/)）。
+~~~text
+Markdown / Front Matter
+        ↓
+src/content/content.js 解析内容
+        ↓
+React 组件读取 posts / projects
+        ↓
+首页、文章索引、文章详情、项目卡片
+        ↓
+Vite 构建 dist
+        ↓
+Netlify 根据 GitHub commit 自动部署
+~~~
 
-### 1. 创建博客仓库
+实现过程分为五层：
 
-当前本地目录还没有 Git 仓库。先在 GitHub 的 `Ouy5517` 账号下新建一个博客仓库，例如 `gugu-blog`，不要复用 `vibe-coding-web-frontend-test` 项目仓库。然后在 PowerShell 执行：
+1. 建立深色视觉系统、导航、首页 Hero、文章卡片和项目卡片。
+2. 将文章和项目从页面代码中抽离为 Markdown 内容文件。
+3. 加入文章索引、搜索、分类、标签、归档、目录和相邻文章导航。
+4. 加入 Markdown 扩展、代码高亮、代码复制和 KaTeX 公式渲染。
+5. 加入 SEO、RSS、站点地图、GitHub 项目数据同步和可选 CMS。
 
-```powershell
-cd C:\Users\14564\Desktop\web_blog\blog-site
-git init
-git branch -M main
-git add .
-git commit -m "chore: initial personal blog"
-git remote add origin https://github.com/Ouy5517/gugu-blog.git
-git push -u origin main
-```
+## 二、技术选型
 
-### 2. 在 Netlify 部署
+| 模块 | 选型 | 用途 |
+| --- | --- | --- |
+| UI 框架 | React 19 | 页面组件、状态和交互 |
+| 构建工具 | Vite 6 | 本地开发和生产构建 |
+| 内容格式 | Markdown + Front Matter | 保存文章和项目 |
+| Markdown 渲染 | react-markdown | 将正文转换为 React 节点 |
+| Markdown 扩展 | remark-gfm | 表格、任务列表、删除线等 GFM 语法 |
+| 数学公式 | remark-math + rehype-katex | 渲染行内公式和块级公式 |
+| 代码高亮 | rehype-highlight | 为代码块添加语法高亮 |
+| 图标 | @phosphor-icons/react | 导航、箭头、GitHub 等图标 |
+| 发布 | Netlify | 构建 dist 并持续部署 |
+| 内容管理 | Decap CMS（预留） | 在 /admin/ 中编辑 Markdown |
 
-1. 登录 Netlify，选择 **Add new project → Import an existing project → GitHub**。
-2. 选择刚创建的博客仓库。
-3. 构建命令填写 `npm run build`，发布目录填写 `dist`。
-4. 添加环境变量 `SITE_URL`，先填 Netlify 分配的域名，例如 `https://gugu-blog.netlify.app`。
-5. 点击 Deploy site。
+## 三、目录结构
 
-项目已经包含 [`netlify.toml`](./netlify.toml) 和 [`public/_redirects`](./public/_redirects)，文章详情页、`/admin/` 等前端路由不会因为刷新而 404。
-
-### 3. 绑定自己的域名
-
-在 Netlify 的 **Domain management** 中添加域名，按页面提示在域名服务商处配置 DNS。绑定完成后，把 `SITE_URL` 改成正式域名并重新部署，这样 RSS、sitemap 和 SEO Canonical 才会使用正式地址。
-
-### 4. 开启 Decap CMS 登录
-
-在 Netlify 项目中依次开启 **Identity** 和 **Git Gateway**，个人博客建议把注册方式设为 **Invite only**。然后访问：
-
-```text
-https://你的域名/admin/
-```
-
-登录后可以直接新增或修改文章、项目，保存后 Decap 会提交 Markdown 到 GitHub，Netlify 再自动构建发布。Git Gateway 的认证步骤见 [Decap 官方文档](https://decapcms.org/docs/git-gateway-backend/)。
-
-### 5. 之后如何更新
-
-- 写文章：在 `/admin/` 中创建，或直接修改 `src/content/posts/*.md`。
-- 改项目：在 `/admin/` 中编辑，或修改 `src/content/projects/*.md`。
-- 每次 GitHub commit 都会触发 Netlify 自动部署。
-- 本地发布前可运行 `npm run build` 检查构建结果。
-
-打开 `http://localhost:5173/`。生产构建使用 `npm run build`。
-
-## 目录结构
-
-```text
+~~~text
 blog-site/
-├─ public/assets/                    图片资源
-├─ src/content/posts/*.md            文章 Markdown 文件
-├─ src/content/projects/*.md         项目 Markdown 文件
-├─ src/content/content.js            Front Matter 解析和内容加载
-├─ src/App.jsx                       页面、路由、搜索和交互
-├─ src/styles.css                    视觉样式、响应式布局和动效
-└─ index.html                        网页标题和 SEO 描述
-```
+├─ public/
+│  ├─ admin/                       Decap CMS 页面和配置
+│  ├─ assets/                      首页、文章封面和关于页面图片
+│  ├─ _redirects                   SPA 路由刷新回退规则
+│  ├─ feed.xml                     构建生成的 RSS
+│  ├─ robots.txt                   构建生成的抓取规则
+│  └─ sitemap.xml                  构建生成的站点地图
+├─ scripts/
+│  ├─ generate-site-assets.mjs     生成 RSS、sitemap、robots
+│  └─ sync-github-projects.mjs     从 GitHub 同步项目元数据
+├─ src/
+│  ├─ App.jsx                      页面、路由、搜索和交互逻辑
+│  ├─ main.jsx                     React 入口
+│  ├─ styles.css                   颜色、排版、响应式和动效
+│  └─ content/
+│     ├─ content.js                Front Matter 解析和内容加载
+│     ├─ posts/                    技术文章 Markdown
+│     └─ projects/                 项目 Markdown
+├─ index.html                      全局语言、标题和基础 SEO
+├─ netlify.toml                    Netlify 构建配置
+├─ package.json                    命令和依赖
+└─ vite.config.mjs                 Vite 配置
+~~~
 
-## 增加或修改文章
+## 四、核心功能的具体实现
 
-在 `src/content/posts/` 新建 Markdown 文件，例如 `2026-09-01-tcp-notes.md`：
+### 4.1 用 Markdown 驱动内容
 
-```md
+src/content/content.js 使用 Vite 的 import.meta.glob 读取两个目录中的 Markdown：
+
+~~~js
+const postModules = import.meta.glob("./posts/*.md", {
+  eager: true,
+  query: "?raw",
+  import: "default",
+});
+~~~
+
+随后代码完成三件事：
+
+1. 找到文件顶部的 --- 区域。
+2. 将 Front Matter 转成 JavaScript 对象。
+3. 把正文和元数据合并为 posts、projects 数组。
+
+页面只依赖这两个数组，因此文章列表、首页精选文章、搜索结果和文章详情使用的是同一份数据。
+
+### 4.2 轻量路由
+
+项目没有引入 React Router，而是使用 window.history.pushState 管理三个主要页面：
+
+~~~text
+/                         首页
+/articles                 文章索引
+/articles/:slug           文章详情
+~~~
+
+readLocation() 根据 pathname 判断当前页面，onNavigate() 修改地址并刷新 React 状态。这样可以保持依赖简单，同时保留干净的文章 URL。
+
+由于这是单页应用，生产服务器需要把未知路径回退到 index.html。项目中的 netlify.toml 和 public/_redirects 已经配置了这条规则，直接刷新文章详情页不会出现 404。
+
+### 4.3 文章索引、搜索和归档
+
+ArticleLibrary 使用 useMemo 对文章做派生计算：
+
+- 搜索标题、摘要、分类、标签和正文。
+- 按分类筛选。
+- 按标签筛选。
+- 按年份生成归档分组。
+- 使用文章 slug 跳转到详情页。
+
+搜索框还监听 Ctrl + K、⌘ + K 和 /，方便在文章较多时快速定位内容。
+
+### 4.4 Markdown、代码和公式渲染
+
+文章正文由下面的插件链处理：
+
+~~~jsx
+<ReactMarkdown
+  remarkPlugins={[remarkGfm, remarkMath]}
+  rehypePlugins={[rehypeKatex, rehypeHighlight]}
+>
+  {normalizeMathBlocks(body)}
+</ReactMarkdown>
+~~~
+
+- GFM 支持表格、任务列表和删除线。
+- rehype-highlight 为 fenced code block 增加高亮。
+- MarkdownCode 自定义代码组件，为代码块增加语言标签和复制按钮。
+- rehype-katex 将 LaTeX 转为公式 DOM，并引入 KaTeX 样式。
+- normalizeMathBlocks() 会把同一行的 $$...$$ 规范化为独立行，避免 Markdown 解析器把块级公式识别成普通文本。
+
+推荐公式写法：
+
+~~~md
+行内公式：机器人受到的外力为 $\mathbf{F}_{\text{ext}}$。
+
+$$
+\mathbf{F}_{\text{ext}} =
+\begin{bmatrix}
+0 \\
+0 \\
+F_z
+\end{bmatrix}
+$$
+~~~
+
+块级公式的两个 $$ 必须各自单独占一行。公式较长时，样式中的 .katex-display 会允许横向滚动，避免移动端撑破页面。
+
+### 4.5 文章目录和长目录处理
+
+TableOfContents 从正文中提取二级和三级标题，并通过 slugify() 生成锚点。目录使用 sticky 布局：
+
+- 桌面端：目录固定在文章右侧。
+- 目录过长：侧栏使用 max-height 和 overflow-y: auto，可以独立滚动。
+- 移动端：目录移动到正文上方，使用两列布局和最大高度滚动。
+
+这样长文章不会把页面高度和布局撑坏，标题也可以直接通过锚点跳转。
+
+### 4.6 动效实现
+
+设计文件中的“暗色画廊”风格通过 CSS 变量和关键帧实现，主要动效集中在 src/styles.css：
+
+- atmosphere：Hero 背景淡入并轻微缩放。
+- headerReveal：顶部导航从下方淡入。
+- heroReveal：Hero 文案和按钮进入。
+- borderTurn：精选文章和项目卡片的边框描边。
+- [data-reveal]：使用 IntersectionObserver，滚动到区块时淡入上移。
+- prefers-reduced-motion：用户开启减少动态效果时，自动降低动画强度。
+
+颜色和字体集中在 :root 中，后续改主题时只需要调整变量，不需要逐个修改组件。
+
+### 4.7 SEO、RSS 和站点地图
+
+applySeo() 会在路由变化时更新：
+
+- document.title
+- description
+- Open Graph 和 Twitter Card
+- canonical URL
+- 首页 WebSite JSON-LD
+- 文章页 TechArticle JSON-LD
+
+构建前会执行 prebuild：
+
+~~~text
+npm run build
+  └─ node scripts/generate-site-assets.mjs
+       ├─ public/feed.xml
+       ├─ public/sitemap.xml
+       └─ public/robots.txt
+~~~
+
+脚本读取文章 Front Matter，根据 SITE_URL 生成绝对链接。正式部署前应设置：
+
+~~~env
+SITE_URL=https://你的正式域名
+~~~
+
+不要把真实 token 写进仓库，.env 已被 .gitignore 忽略。
+
+### 4.8 GitHub 项目同步
+
+项目文件中加入下面的字段后，脚本才会同步该仓库：
+
+~~~yaml
+githubSync: true
+~~~
+
+执行：
+
+~~~powershell
+npm run sync:github
+~~~
+
+脚本会读取 GitHub API，并更新项目的：
+
+- 仓库地址
+- 描述
+- 项目状态
+- Star 数
+- Fork 数
+- 最近更新时间
+
+标题、技术栈和正文不会被覆盖。遇到 API 限流时，可以在本地 .env 中配置 GITHUB_TOKEN。
+
+## 五、文章和项目如何增加
+
+### 5.1 新增文章
+
+在 src/content/posts/ 创建 Markdown 文件，例如 2026-09-01-tcp-notes.md：
+
+~~~md
 ---
 slug: tcp-notes
 date: 2026.09.01
@@ -90,7 +255,7 @@ tags:
   - 课程笔记
 title: TCP 拥塞控制学习笔记
 excerpt: 记录慢启动、拥塞避免和快速重传的核心思路。
-image: /assets/tcp-notes.png
+image: /assets/card-periwinkle.png
 readingTime: 8
 draft: false
 ---
@@ -98,64 +263,27 @@ draft: false
 ## 正文标题
 
 这里写文章内容。
-```
+~~~
 
-字段说明：
+关键字段：
 
 | 字段 | 作用 |
 | --- | --- |
-| `slug` | 文章 URL，例如 `/articles/tcp-notes` |
-| `date` | 发布日期，用于排序和归档 |
-| `category` | 文章分类 |
-| `tags` | 标签数组，用于筛选和搜索 |
-| `title` | 文章标题 |
-| `excerpt` | 首页和文章列表摘要 |
-| `image` | 封面路径，从 `/assets/` 开始 |
-| `readingTime` | 阅读时间，单位为分钟 |
-| `draft` | 设置为 `true` 时不会显示 |
+| slug | 文章 URL，建议只用小写英文、数字和连字符 |
+| date | 排序和归档日期，格式为 YYYY.MM.DD |
+| category | 文章分类 |
+| tags | 标签数组 |
+| title | 文章标题 |
+| excerpt | 首页和索引页摘要 |
+| image | 必须从 /assets/ 开始 |
+| readingTime | 阅读时间，单位为分钟 |
+| draft | true 时不会进入页面和 RSS |
 
-保存后，文章会自动出现在首页、`/articles`、分类筛选、标签筛选、年度归档和搜索结果中。
+### 5.2 新增项目
 
-文章详情地址为：
+在 src/content/projects/ 创建 Markdown 文件：
 
-```text
-http://localhost:5173/articles/你的-slug
-```
-
-## 技术文章支持
-
-正文使用 GitHub Flavored Markdown，支持标题、列表、引用、表格、代码高亮、代码复制、文章目录、外部链接和 KaTeX 数学公式。
-
-代码示例：
-
-~~~tsx
-const progress = Math.min(Math.max(scrollY / height, 0), 1);
-~~~
-
-文章中的二级和三级标题会自动生成目录锚点。
-
-行内公式使用单个美元符号，独立公式使用单独成行的双美元符号：
-
-```md
-机器人受到的外力为 $\mathbf{F}_{\text{ext}}$。
-
-$$
-\mathbf{F}_{\text{ext}} =
-\begin{bmatrix} 0 \\ 0 \\ F_z \end{bmatrix}
-$$
-```
-
-独立公式的 `$$` 起止标记需要各自占一行，这样才能正确识别为块级公式。
-
-## 搜索、分类和归档
-
-访问 `/articles` 可以使用关键词搜索标题、摘要、正文和标签，也可以按分类、标签和年份浏览。按 `Ctrl + K`、`⌘ + K` 或 `/` 可以快速聚焦搜索框。
-
-## 增加或修改项目
-
-在 `src/content/projects/` 新建 Markdown 文件：
-
-```md
+~~~md
 ---
 name: minidb
 title: MiniDB：简易数据库实现
@@ -167,98 +295,102 @@ stack:
 url: https://github.com/你的用户名/minidb
 status: 进行中
 featured: true
+githubSync: false
 ---
 
 这里可以写项目补充说明。
-```
+~~~
 
-当前已加入：[vibe-coding-web-frontend-test](https://github.com/Ouy5517/vibe-coding-web-frontend-test)。项目区会自动读取 `projects` 文件夹中的内容，不需要修改 JSX。
+页面会自动读取 projects 文件夹中的所有项目，不需要修改 App.jsx。
 
-## 添加图片
+### 5.3 添加文章图片
 
-将图片放入 `public/assets/`，然后在 Front Matter 中使用：
+将图片放入 public/assets/，Front Matter 使用：
 
-```yaml
+~~~yaml
 image: /assets/tcp-notes.png
-```
+~~~
 
-不要写成 `public/assets/tcp-notes.png`。图片建议使用小写英文和连字符命名，并尽量压缩体积。
+不要写成 public/assets/tcp-notes.png。图片建议使用小写英文和连字符命名，并在提交前压缩体积。
 
-## 页面地址
+## 六、本地开发和验证
 
-| 地址 | 页面 |
+~~~powershell
+git clone https://github.com/Ouy5517/gugugaga-blog.git
+cd gugugaga-blog
+npm install
+npm run dev
+~~~
+
+常用命令：
+
+| 命令 | 用途 |
 | --- | --- |
-| `/` | 首页、精选文章、项目和关于博客 |
-| `/articles` | 文章索引、搜索、分类、标签和归档 |
-| `/articles/:slug` | 文章详情页 |
+| npm run dev | 启动本地开发服务器 |
+| npm run build | 生成生产构建并同步 RSS、sitemap、robots |
+| npm run preview | 预览 dist 构建结果 |
+| npm run sync:github | 同步勾选了 githubSync 的项目 |
 
-## GitHub 更新方式
+提交前建议至少验证：
 
-当前最简单的更新流程是：
+1. 首页、/articles 和一篇文章详情页可以打开。
+2. 直接刷新 /articles/文章-slug 不出现 404。
+3. 搜索、分类、标签和归档筛选正常。
+4. 代码复制按钮和 KaTeX 公式正常显示。
+5. 长目录可以滚动，移动端没有横向溢出。
+6. npm run build 成功完成。
 
-1. 在 GitHub 网页中打开 `src/content/posts/` 或 `src/content/projects/`。
-2. 新建或修改 `.md` 文件。
-3. 提交 Commit。
-4. 部署平台重新构建后，网站自动更新。
+## 七、部署实现
 
-后续可以接入 Decap CMS 或 Outstatic，为 Markdown 文件增加可视化编辑后台。
+项目使用 Netlify 的持续部署链路：
 
-## 第二阶段：发布与项目同步
+~~~text
+本地修改 Markdown / React / CSS
+        ↓ git commit + git push
+GitHub main
+        ↓ webhook
+Netlify: npm run build
+        ↓
+发布 dist
+~~~
 
-### SEO、RSS 和站点地图
+Netlify 构建配置已经写入 netlify.toml：
 
-页面会根据当前路由更新标题、描述、Canonical、Open Graph、Twitter Card 和 JSON-LD 结构化数据。文章页会使用 `TechArticle` schema，首页会使用 `WebSite` schema。
+~~~toml
+[build]
+  command = "npm run build"
+  publish = "dist"
+~~~
 
-构建时会自动生成三类发布文件：
+在 Netlify 导入 Ouy5517/gugugaga-blog 后确认：
 
-- `/feed.xml`：RSS 订阅源，文章新增后随构建更新。
-- `/sitemap.xml`：首页、文章索引和全部文章详情页的站点地图。
-- `/robots.txt`：允许搜索引擎抓取，并指向 sitemap。
+- Branch：main
+- Build command：npm run build
+- Publish directory：dist
+- Environment variable：SITE_URL=https://你的站点域名
 
-生产环境部署前，将 `.env.example` 复制为 `.env`，把 `SITE_URL` 改成博客正式域名。构建命令会读取这个地址生成正确的绝对链接：
+当前仓库还包含 public/admin/，用于预留 Decap CMS。若启用后台，需要额外配置身份认证和 GitHub 写入权限；生产环境建议先使用 GitHub 提交 Markdown，确认部署稳定后再配置 CMS 登录。
 
-```powershell
-npm run build
-```
+## 八、如何更新线上内容
 
-`.env` 已加入 `.gitignore`，不要把 GitHub Token 提交到仓库。
+最稳定的更新流程是：
 
-项目 Front Matter 增加 `githubSync: true` 后，可以手动从 GitHub 刷新仓库描述、地址、状态、Star、Fork 和最近更新时间：
+1. 修改或新增 src/content/posts/*.md、src/content/projects/*.md。
+2. 本地执行 npm run build。
+3. 检查 git diff，确认只包含预期文件。
+4. 提交并推送到 main。
+5. Netlify 自动构建，构建完成后线上内容更新。
 
-```yaml
-githubSync: true
-```
+也可以直接在 GitHub 网页编辑 Markdown 文件。提交后，Netlify 会走同样的自动部署流程。
 
-然后执行：
+## 九、当前限制和后续计划
 
-```powershell
-npm run sync:github
-```
+- 订阅表单目前只显示本地成功状态，还没有接入真实邮件服务。
+- 评论功能尚未接入，后续可以增加 Giscus。
+- Front Matter 使用轻量解析器，字段格式需要遵循示例。
+- Decap CMS 已预留页面和集合配置，但后台认证仍需要单独配置。
+- 当前项目是客户端渲染的 Vite SPA，后续如果文章数量明显增长，可以迁移到 Astro、Hugo 或 Next.js 以获得更强的静态生成能力。
 
-脚本默认同步 GitHub 用户 `Ouy5517` 的公开仓库；如遇 API 限流，可在 `.env` 中配置 `GITHUB_TOKEN`。只有标记了 `githubSync: true` 的项目会被更新，项目正文和自定义标题不会被覆盖。
+## License
 
-### Decap CMS 内容管理
-
-管理后台已经放在 `/admin/`，配置文件为 `public/admin/config.yml`。它包含“技术文章”和“项目”两个集合，字段与 `src/content/` 的 Front Matter 对齐，支持上传 `public/assets/` 图片。
-
-Decap CMS 使用 Git Gateway 提交 Git 仓库变更。正式部署到 Netlify 时，需要在站点控制台开启 Netlify Identity 和 Git Gateway，然后访问：
-
-```text
-https://你的域名/admin/
-```
-
-本地开发可以保留 `local_backend: true`，并额外运行 Decap 本地代理；如果暂时没有配置代理，直接编辑 Markdown 文件不会受影响。CMS 配置遵循 Decap 的 `/admin/config.yml`、folder collection 和 Git Gateway 约定（[官方配置文档](https://decapcms.org/docs/configure-decap-cms/)）。
-
-## 修改博客信息和动效
-
-博客名称和 SEO 描述主要位于 `src/App.jsx`、`index.html`。颜色、字体、响应式布局和动效位于 `src/styles.css`。
-
-主要动效包括：`heroReveal`、`headerReveal`、`atmosphere`、`borderTurn` 和 `[data-reveal]`。
-
-## 当前未接入的功能
-
-- 订阅表单目前只显示本地成功状态，不会真正发送邮件。
-- 评论区和真正的邮件订阅服务尚未接入。
-- 内容解析目前使用轻量 Front Matter 解析器，字段格式需要遵循示例。
-
-下一阶段可以继续接入 Giscus 评论和邮件订阅服务。
+博客内容和代码仅供学习与个人展示使用。文章转载请保留原作者信息和原文链接。
