@@ -6,7 +6,6 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "test": "node --test tests/ventriloc-toolbox.test.mjs",
     "prebuild": "node scripts/generate-site-assets.mjs",
     "sync:github": "node scripts/sync-github-projects.mjs",
     "preview": "vite preview"

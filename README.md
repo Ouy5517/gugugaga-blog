@@ -68,7 +68,6 @@ blog-site/
 │  ├─ App.jsx                      页面、路由、搜索和交互逻辑
 │  ├─ main.jsx                     React 入口
 │  ├─ styles.css                   颜色、排版、响应式和动效
-│  ├─ toolbox/                     工具箱的本地工具适配器
 │  └─ content/
 │     ├─ content.js                Front Matter 解析和内容加载
 │     ├─ posts/                    技术文章 Markdown
@@ -114,13 +113,6 @@ const postModules = import.meta.glob("./posts/*.md", {
 readLocation() 根据 pathname 判断当前页面，onNavigate() 修改地址并刷新 React 状态。这样可以保持依赖简单，同时保留干净的文章 URL。
 
 由于这是单页应用，生产服务器需要把未知路径回退到 index.html。项目中的 netlify.toml 和 public/_redirects 已经配置了这条规则，直接刷新文章详情页不会出现 404。
-
-当前路由还包括：
-
-~~~text
-/tools                  工具箱
-/tools/ventriloc        Ventriloc 本地音乐转换器
-~~~
 
 ### 4.3 文章索引、搜索和归档
 
@@ -255,22 +247,6 @@ npm run sync:github
 
 标题、技术栈和正文不会被覆盖。遇到 API 限流时，可以在本地 .env 中配置 GITHUB_TOKEN。
 
-### 4.9 工具箱与 Ventriloc
-
-工具箱页面位于 `/tools`，第一项工具是 `/tools/ventriloc`。博客只提供适配后的操作界面，Ventriloc 的解码算法仍保留在独立项目中：
-
-~~~text
-博客页面（Netlify）
-        ↓ fetch（仅请求本机回环地址）
-Ventriloc API：http://127.0.0.1:8765
-        ↓
-本地转换队列与下载结果
-~~~
-
-使用前在 `decrypt-mflac-frida-main/webapp/` 运行 `run.bat`，让服务监听 `127.0.0.1:8765`。博客页面会自动检查健康状态，并支持 `.mflac → .flac`、`.mgg → .ogg`、拖拽上传、任务进度和结果下载。
-
-为了允许 Netlify 页面访问本地服务，Ventriloc API 只对白名单来源开启 CORS：`https://gugugaga-blog.netlify.app` 以及本地开发地址。不要把 API 改成允许任意来源；如果浏览器拦截了本地请求，可以使用工具页中的“打开本地工具页面”备用入口。
-
 ## 五、文章和项目如何增加
 
 ### 5.1 新增文章
@@ -359,7 +335,6 @@ npm run dev
 | 命令 | 用途 |
 | --- | --- |
 | npm run dev | 启动本地开发服务器 |
-| npm test | 运行工具箱适配器测试 |
 | npm run build | 生成生产构建并同步 RSS、sitemap、robots |
 | npm run preview | 预览 dist 构建结果 |
 | npm run sync:github | 同步勾选了 githubSync 的项目 |
@@ -371,8 +346,7 @@ npm run dev
 3. 搜索、分类、标签和归档筛选正常。
 4. 代码复制按钮和 KaTeX 公式正常显示。
 5. 长目录可以滚动，移动端没有横向溢出。
-6. /tools/ventriloc 能显示本地服务在线或离线状态。
-7. npm run build 成功完成。
+6. npm run build 成功完成。
 
 ## 七、部署实现
 
