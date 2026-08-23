@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const postsDir = path.join(root, "src", "content", "posts");
-const publicDir = path.join(root, "public");
+const publicDir = path.resolve(process.env.SITE_ASSETS_OUTPUT_DIR || path.join(root, "public"));
 
 function loadDotEnv() {
   try {

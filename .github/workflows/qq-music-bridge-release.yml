@@ -10,21 +10,45 @@ jobs:
   build:
     runs-on: windows-latest
     permissions:
-      contents: write
+      contents: read
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: "3.12"
       - run: python -m pip install -r bridge/qq-music/requirements-build.txt
       - run: python -m unittest discover -s bridge/qq-music/tests -v
       - shell: powershell
         run: ./bridge/qq-music/build.ps1
-      - uses: actions/upload-artifact@v4
+      - shell: powershell
+        run: |
+          if (-not (Test-Path -LiteralPath "dist/qq-music-bridge.exe" -PathType Leaf)) {
+            throw "Build did not produce dist/qq-music-bridge.exe"
+          }
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: qq-music-bridge
           path: dist/qq-music-bridge.exe
-      - uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/tags/qq-music-bridge-v')
+          if-no-files-found: error
+
+  release:
+    needs: [build]
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/qq-music-bridge-v')
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
         with:
-          files: dist/qq-music-bridge.exe
+          name: qq-music-bridge
+          path: dist
+      - shell: powershell
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $asset = "dist/qq-music-bridge.exe"
+          if (-not (Test-Path -LiteralPath $asset -PathType Leaf)) {
+            throw "Release artifact is missing: $asset"
+          }
+          gh release create "$env:GITHUB_REF_NAME" --title "$env:GITHUB_REF_NAME" --generate-notes
+          gh release upload "$env:GITHUB_REF_NAME" $asset --clobber

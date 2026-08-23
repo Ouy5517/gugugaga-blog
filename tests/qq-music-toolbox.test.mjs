@@ -1,8 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import fsPromises from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import os from "node:os";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createServer } from "vite";
@@ -10,6 +14,8 @@ import { bridgeUrl, formatBytes, statusLabel, targetFor } from "../src/toolbox/q
 import { createJobPoller } from "../src/toolbox/jobPolling.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const execFileAsync = promisify(execFile);
+const YAML = await import("yaml").catch(() => null);
 
 let viteServer;
 
@@ -144,11 +150,31 @@ test("renders the converter dropzone and local-only conversion guidance", async 
   assert.match(html, /桥接服务/);
 });
 
-test("publishes toolbox routes in the generated sitemap", () => {
-  const sitemap = fs.readFileSync(path.join(root, "public", "sitemap.xml"), "utf8");
+test("generates toolbox sitemap routes for the production origin without changing public assets", async () => {
+  const outputDir = await fsPromises.mkdtemp(path.join(os.tmpdir(), "qq-music-sitemap-"));
+  const publicSitemapPath = path.join(root, "public", "sitemap.xml");
+  const publicSitemap = await fsPromises.readFile(publicSitemapPath);
 
-  assert.match(sitemap, /<loc>http:\/\/localhost:5173\/tools<\/loc>/);
-  assert.match(sitemap, /<loc>http:\/\/localhost:5173\/tools\/qq-music-converter<\/loc>/);
+  try {
+    await execFileAsync(process.execPath, ["scripts/generate-site-assets.mjs"], {
+      cwd: root,
+      env: {
+        ...process.env,
+        SITE_URL: "https://gugugaga-blog.netlify.app",
+        SITE_ASSETS_OUTPUT_DIR: outputDir,
+      },
+    });
+
+    const sitemapPath = path.join(outputDir, "sitemap.xml");
+    assert.ok(fs.existsSync(sitemapPath), "generator must write sitemap to SITE_ASSETS_OUTPUT_DIR");
+    const sitemap = await fsPromises.readFile(sitemapPath, "utf8");
+    assert.match(sitemap, /<loc>https:\/\/gugugaga-blog\.netlify\.app\/tools<\/loc>/);
+    assert.match(sitemap, /<loc>https:\/\/gugugaga-blog\.netlify\.app\/tools\/qq-music-converter<\/loc>/);
+    assert.deepEqual(await fsPromises.readFile(publicSitemapPath), publicSitemap);
+  } finally {
+    await fsPromises.writeFile(publicSitemapPath, publicSitemap);
+    await fsPromises.rm(outputDir, { recursive: true, force: true });
+  }
 });
 
 test("documents local QQ Music bridge operation and maintenance", () => {
@@ -168,22 +194,42 @@ test("documents local QQ Music bridge operation and maintenance", () => {
   assert.match(bridgeReadme, /hook symbols|Hook symbols|挂钩符号|符号/);
 });
 
-test("defines a Windows release workflow with the public bridge filename", () => {
+test("defines a least-privilege, immutable Windows release workflow", () => {
   const workflowPath = path.join(root, ".github", "workflows", "qq-music-bridge-release.yml");
 
   assert.ok(fs.existsSync(workflowPath), "release workflow must exist");
-  const workflow = fs.readFileSync(workflowPath, "utf8");
-  assert.match(workflow, /workflow_dispatch:/);
-  assert.match(workflow, /qq-music-bridge-v\*/);
-  assert.match(workflow, /runs-on: windows-latest/);
-  assert.match(workflow, /actions\/checkout@v4/);
-  assert.match(workflow, /actions\/setup-python@v5/);
-  assert.match(workflow, /python-version: ["']3\.12["']/);
-  assert.match(workflow, /requirements-build\.txt/);
-  assert.match(workflow, /python -m unittest discover -s bridge\/qq-music\/tests -v/);
-  assert.match(workflow, /\.\/bridge\/qq-music\/build\.ps1/);
-  assert.match(workflow, /actions\/upload-artifact@v4/);
-  assert.match(workflow, /path: dist\/qq-music-bridge\.exe/);
-  assert.match(workflow, /softprops\/action-gh-release@v2/);
-  assert.match(workflow, /files: dist\/qq-music-bridge\.exe/);
+  assert.ok(YAML, "yaml must be installed to parse the release workflow structurally");
+  const workflow = YAML.parse(fs.readFileSync(workflowPath, "utf8"));
+  const build = workflow.jobs?.build;
+  const release = workflow.jobs?.release;
+
+  assert.equal(workflow.on?.workflow_dispatch, null);
+  assert.deepEqual(workflow.on?.push?.tags, ["qq-music-bridge-v*"]);
+  assert.equal(build?.["runs-on"], "windows-latest");
+  assert.deepEqual(build?.permissions, { contents: "read" });
+  assert.equal(release?.["runs-on"], "windows-latest");
+  assert.deepEqual(release?.needs, ["build"]);
+  assert.equal(release?.if, "github.event_name == 'push' && startsWith(github.ref, 'refs/tags/qq-music-bridge-v')");
+  assert.deepEqual(release?.permissions, { contents: "write" });
+
+  const uses = (steps, action) => steps.find((step) => step.uses?.startsWith(`${action}@`));
+  assert.equal(uses(build.steps, "actions/checkout")?.uses, "actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09");
+  assert.equal(uses(build.steps, "actions/setup-python")?.uses, "actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1");
+  const upload = uses(build.steps, "actions/upload-artifact");
+  assert.equal(upload?.uses, "actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f");
+  assert.equal(upload?.with?.name, "qq-music-bridge");
+  assert.equal(upload?.with?.path, "dist/qq-music-bridge.exe");
+  assert.equal(upload?.with?.["if-no-files-found"], "error");
+  assert.match(build.steps.find((step) => step.run?.includes("Test-Path -LiteralPath"))?.run || "", /qq-music-bridge\.exe/);
+
+  const download = uses(release.steps, "actions/download-artifact");
+  assert.equal(download?.uses, "actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53");
+  assert.equal(download?.with?.name, "qq-music-bridge");
+  assert.equal(download?.with?.path, "dist");
+  const releaseCommand = release.steps.find((step) => step.run?.includes("gh release create"));
+  assert.equal(releaseCommand?.env?.GH_TOKEN, "${{ secrets.GITHUB_TOKEN }}");
+  assert.match(releaseCommand?.run || "", /gh release create/);
+  assert.match(releaseCommand?.run || "", /gh release upload/);
+  assert.match(releaseCommand?.run || "", /Test-Path -LiteralPath/);
+  assert.ok(![...build.steps, ...release.steps].some((step) => step.uses?.startsWith("softprops/action-gh-release@")));
 });

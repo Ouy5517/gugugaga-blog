@@ -14,7 +14,7 @@ powershell -ExecutionPolicy Bypass -File bridge/qq-music/build.ps1
 dist\qq-music-bridge.exe
 ```
 
-`build.ps1` 会安装 `requirements-build.txt` 中的构建依赖，并以 PyInstaller 生成 Windows 可执行文件。发布工作流会将公开下载资产固定命名为 `qq-music-bridge.exe`。
+`build.ps1` 会安装 `requirements-build.txt` 中的构建依赖，并以 PyInstaller 生成 Windows 可执行文件。发布工作流会将公开下载资产固定命名为 `qq-music-bridge.exe`：手动运行只构建并上传 artifact；推送 `qq-music-bridge-v*` tag 时，才会用 GitHub CLI 创建 Release 并上传该文件。
 
 ## QQ 音乐更新后的维护
 

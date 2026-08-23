@@ -23,5 +23,8 @@
     "remark-gfm": "^4.0.1",
     "remark-math": "^6.0.0",
     "vite": "6.4.2"
+  },
+  "devDependencies": {
+    "yaml": "^2.9.0"
   }
 }
