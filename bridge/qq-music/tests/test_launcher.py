@@ -1,4 +1,5 @@
 from pathlib import Path
+import io
 import os
 import subprocess
 import sys
@@ -76,6 +77,20 @@ class LauncherTests(unittest.TestCase):
 
         wait_for_health.assert_called_once_with()
         open_browser.assert_called_once_with(main.TOOL_URL)
+
+    def test_main_does_not_crash_on_a_legacy_windows_console(self):
+        server = MagicMock()
+        server.job_manager = MagicMock()
+        thread = MagicMock()
+        thread.join.side_effect = [KeyboardInterrupt, None]
+        output_bytes = io.BytesIO()
+        legacy_stdout = io.TextIOWrapper(output_bytes, encoding="cp1252", errors="strict")
+
+        with patch("main.build_server", return_value=server), patch("main.threading.Thread", return_value=thread), patch("sys.stdout", legacy_stdout):
+            self.assertEqual(main.main(open_browser=False), 0)
+
+        legacy_stdout.flush()
+        self.assertIn("8765", output_bytes.getvalue().decode("cp1252"))
 
     def test_run_cli_disables_browser_for_no_browser_argument(self):
         with patch("main.main", return_value=0) as launch:

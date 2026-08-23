@@ -15,6 +15,13 @@ BRIDGE_URL = "http://127.0.0.1:8765"
 TOOL_URL = "https://gugugaga-blog.netlify.app/tools/qq-music-converter"
 
 
+def _safe_print(message: str) -> None:
+    """Print status text without crashing on legacy Windows consoles."""
+    encoding = getattr(sys.stdout, "encoding", None) or "utf-8"
+    safe_message = message.encode(encoding, errors="replace").decode(encoding)
+    print(safe_message)
+
+
 def resource_path(relative: str) -> Path:
     """Return a bundled resource path both in development and PyInstaller."""
     base = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
@@ -53,19 +60,19 @@ def main(open_browser: bool = True) -> int:
         server = build_server()
     except OSError as error:
         if error.errno == 10048:
-            print("本地服务端口 8765 已被占用，请关闭占用该端口的程序后重试。")
+            _safe_print("本地服务端口 8765 已被占用，请关闭占用该端口的程序后重试。")
         else:
-            print(f"无法启动 QQ 音乐转换服务：{error}")
+            _safe_print(f"无法启动 QQ 音乐转换服务：{error}")
         return 1
     thread = threading.Thread(target=server.serve_forever, name="qq-music-bridge", daemon=True)
     thread.start()
-    print(f"QQ 音乐转换服务已启动：{BRIDGE_URL}")
+    _safe_print(f"QQ 音乐转换服务已启动：{BRIDGE_URL}")
     try:
         if open_browser and _wait_for_health():
             webbrowser.open(TOOL_URL)
         thread.join()
     except KeyboardInterrupt:
-        print("正在停止 QQ 音乐转换服务…")
+        _safe_print("正在停止 QQ 音乐转换服务…")
     finally:
         server.shutdown()
         server.server_close()
