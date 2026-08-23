@@ -10,8 +10,13 @@ import { categories, findPost, posts, projects, tags } from "./content/content.j
 
 function readLocation() {
   const pathname = window.location.pathname.replace(/\/$/, "") || "/";
-  const match = pathname.match(/^\/articles\/([^/]+)$/);
-  return { pathname, articleSlug: match ? decodeURIComponent(match[1]) : null };
+  const articleMatch = pathname.match(/^\/articles\/([^/]+)$/);
+  const toolMatch = pathname.match(/^\/tools\/([^/]+)$/);
+  return {
+    pathname,
+    articleSlug: articleMatch ? decodeURIComponent(articleMatch[1]) : null,
+    toolSlug: toolMatch ? decodeURIComponent(toolMatch[1]) : null,
+  };
 }
 
 function slugify(value) {
@@ -35,8 +40,10 @@ function setMeta(attribute, key, content) {
 function applySeo(location) {
   const post = location.articleSlug ? findPost(location.articleSlug) : null;
   const isLibrary = location.pathname === "/articles" || location.pathname === "/archive";
-  const title = post ? `${post.title} · 咕咕嘎嘎的个人博客` : isLibrary ? "文章索引 · 咕咕嘎嘎的个人博客" : "咕咕嘎嘎的个人博客";
-  const description = post?.excerpt || (isLibrary ? "浏览咕咕嘎嘎关于计算机学习、技术实践与个人项目的文章。" : "分享计算机学习、技术文章与个人项目。") ;
+  const isToolboxIndex = location.pathname === "/tools";
+  const isQqMusicConverter = location.pathname === "/tools/qq-music-converter";
+  const title = post ? `${post.title} · 咕咕嘎嘎的个人博客` : isLibrary ? "文章索引 · 咕咕嘎嘎的个人博客" : isToolboxIndex ? "工具箱 · 咕咕嘎嘎的个人博客" : isQqMusicConverter ? "QQ 音乐本地转换工具 · 咕咕嘎嘎的个人博客" : "咕咕嘎嘎的个人博客";
+  const description = post?.excerpt || (isLibrary ? "浏览咕咕嘎嘎关于计算机学习、技术实践与个人项目的文章。" : isToolboxIndex ? "浏览咕咕嘎嘎整理的本地实用工具。" : isQqMusicConverter ? "通过本地桥接服务转换 QQ 音乐缓存文件。" : "分享计算机学习、技术文章与个人项目。");
   const canonicalUrl = new URL(location.pathname || "/", window.location.origin).toString();
   const imageUrl = post?.image ? new URL(post.image, window.location.origin).toString() : new URL("/assets/card-periwinkle.png", window.location.origin).toString();
   document.title = title;

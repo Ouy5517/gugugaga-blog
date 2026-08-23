@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "test": "node --test tests/qq-music-toolbox.test.mjs",
     "build": "vite build",
     "prebuild": "node scripts/generate-site-assets.mjs",
     "sync:github": "node scripts/sync-github-projects.mjs",
