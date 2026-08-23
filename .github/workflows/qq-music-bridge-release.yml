@@ -47,7 +47,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
         run: |
-          $ErrorActionPreference = "Stop"
+          $ErrorActionPreference = "Continue"
           $asset = "dist/qq-music-bridge.exe"
           $tag = "$env:GITHUB_REF_NAME"
           if (-not (Test-Path -LiteralPath $asset -PathType Leaf)) {
