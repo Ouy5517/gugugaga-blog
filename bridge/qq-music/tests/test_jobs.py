@@ -1,0 +1,188 @@
+import sys
+from pathlib import Path
+import queue
+import tempfile
+import threading
+import time
+import unittest
+from unittest.mock import patch
+
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from bridge.converter import ConversionError
+from bridge.jobs import JobManager
+
+
+def wait_until(predicate, timeout=2):
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if predicate():
+            return True
+        time.sleep(0.01)
+    return predicate()
+
+
+class JobManagerTests(unittest.TestCase):
+    def setUp(self):
+        self.temporary_directory = tempfile.TemporaryDirectory()
+        self.root = Path(self.temporary_directory.name)
+        self.output_dir = self.root / "output"
+        self.incoming_dir = self.root / "incoming"
+        self.managers = []
+
+    def tearDown(self):
+        for manager in self.managers:
+            manager.shutdown()
+        self.temporary_directory.cleanup()
+
+    def make_manager(self, converter):
+        manager = JobManager(converter, self.output_dir, self.incoming_dir)
+        self.managers.append(manager)
+        return manager
+
+    def test_worker_completes_job_and_removes_uploaded_source(self):
+        source = self.root / "song.mflac"
+        source.write_bytes(b"encrypted")
+
+        def converter(source_path, source_name, output_dir, progress):
+            progress(50, "正在解密")
+            target = output_dir / "song.flac"
+            target.write_bytes(source_path.read_bytes())
+            progress(100, "转换完成")
+            return target
+
+        manager = self.make_manager(converter)
+        job = manager.submit("song.mflac", source)
+
+        self.assertTrue(wait_until(lambda: job.status == "completed"))
+        self.assertEqual(job.progress, 100)
+        self.assertFalse(source.exists())
+        self.assertEqual(job.to_dict()["downloadUrl"], f"/api/download/{job.job_id}")
+
+    def test_worker_serializes_native_calls(self):
+        active_calls = 0
+        max_active_calls = 0
+        counter_lock = threading.Lock()
+
+        def converter(source_path, source_name, output_dir, progress):
+            nonlocal active_calls, max_active_calls
+            with counter_lock:
+                active_calls += 1
+                max_active_calls = max(max_active_calls, active_calls)
+            time.sleep(0.05)
+            target = output_dir / f"{Path(source_name).stem}.flac"
+            target.write_bytes(b"decoded")
+            with counter_lock:
+                active_calls -= 1
+            return target
+
+        manager = self.make_manager(converter)
+        first = self.root / "first.mflac"
+        second = self.root / "second.mflac"
+        first.write_bytes(b"one")
+        second.write_bytes(b"two")
+        first_job = manager.submit(first.name, first)
+        second_job = manager.submit(second.name, second)
+
+        self.assertTrue(wait_until(lambda: first_job.status == "completed"))
+        self.assertTrue(wait_until(lambda: second_job.status == "completed"))
+        self.assertEqual(max_active_calls, 1)
+
+    def test_worker_never_exposes_an_output_outside_the_output_directory(self):
+        source = self.root / "song.mflac"
+        source.write_bytes(b"encrypted")
+        outside_output = self.root / "outside.flac"
+        outside_output.write_bytes(b"decoded")
+
+        manager = self.make_manager(lambda *_args: outside_output)
+        job = manager.submit(source.name, source)
+
+        self.assertTrue(wait_until(lambda: job.status == "failed"))
+        self.assertNotIn("downloadUrl", job.to_dict())
+        self.assertNotIn(str(self.root), job.to_dict()["error"])
+
+    def test_worker_preserves_only_safe_actionable_conversion_errors(self):
+        unsafe_source = self.root / "unsafe.mflac"
+        unsafe_source.write_bytes(b"encrypted")
+        for index, actionable in enumerate((
+            "Frida 运行环境不可用，请重新下载并启动 QQ Music Bridge",
+            "无法连接 QQ 音乐，请确认 QQ 音乐正在运行；若已运行，请退出后重新启动 QQ 音乐，再重试",
+            "当前 QQ 音乐版本暂不兼容，请更新 QQ Music Bridge 或更换 QQ 音乐版本",
+        )):
+            with self.subTest(actionable=actionable):
+                safe_source = self.root / f"safe-{index}.mflac"
+                safe_source.write_bytes(b"encrypted")
+
+                def safe_failure(*_args, message=actionable):
+                    raise ConversionError(message)
+
+                safe_manager = self.make_manager(safe_failure)
+                safe_job = safe_manager.submit(safe_source.name, safe_source)
+                self.assertTrue(wait_until(lambda: safe_job.status == "failed"))
+                self.assertEqual(safe_job.to_dict()["error"], actionable)
+
+        def unsafe_failure(*_args):
+            raise ConversionError(f"failed beside {self.root}")
+
+        unsafe_manager = self.make_manager(unsafe_failure)
+        unsafe_job = unsafe_manager.submit(unsafe_source.name, unsafe_source)
+        self.assertTrue(wait_until(lambda: unsafe_job.status == "failed"))
+        self.assertNotIn(str(self.root), unsafe_job.to_dict()["error"])
+
+    def test_worker_removes_its_empty_incoming_job_directory(self):
+        job_dir = self.incoming_dir / "job-under-test"
+        job_dir.mkdir(parents=True)
+        source = job_dir / "song.mflac"
+        source.write_bytes(b"encrypted")
+
+        def converter(_source_path, _source_name, output_dir, _progress):
+            target = output_dir / "song.flac"
+            target.write_bytes(b"decoded")
+            return target
+
+        manager = self.make_manager(converter)
+        job = manager.submit(source.name, source)
+
+        self.assertTrue(wait_until(lambda: job.status == "completed"))
+        self.assertFalse(job_dir.exists())
+        self.assertEqual(list(self.incoming_dir.iterdir()), [])
+
+    def test_shutdown_waits_for_an_accepted_job_and_cleans_its_source(self):
+        class PausingQueue(queue.Queue):
+            job_put_started = threading.Event()
+            allow_job_put = threading.Event()
+
+            def put(self, item, *args, **kwargs):
+                if item is not None:
+                    self.job_put_started.set()
+                    self.allow_job_put.wait(timeout=2)
+                return super().put(item, *args, **kwargs)
+
+        source = self.root / "song.mflac"
+        source.write_bytes(b"encrypted")
+
+        def converter(_source_path, _source_name, output_dir, _progress):
+            target = output_dir / "song.flac"
+            target.write_bytes(b"decoded")
+            return target
+
+        with patch("bridge.jobs.Queue", PausingQueue):
+            manager = self.make_manager(converter)
+            submitted = []
+            submitter = threading.Thread(target=lambda: submitted.append(manager.submit(source.name, source)))
+            submitter.start()
+            self.assertTrue(manager._queue.job_put_started.wait(timeout=2))
+            shutdown_started = threading.Event()
+            shutdown_thread = threading.Thread(target=lambda: (shutdown_started.set(), manager.shutdown()))
+            shutdown_thread.start()
+            self.assertTrue(shutdown_started.wait(timeout=2))
+            time.sleep(0.05)
+            self.assertTrue(shutdown_thread.is_alive())
+            manager._queue.allow_job_put.set()
+            submitter.join(timeout=2)
+            shutdown_thread.join(timeout=2)
+
+        self.assertEqual(len(submitted), 1)
+        self.assertEqual(submitted[0].status, "completed")
+        self.assertFalse(source.exists())

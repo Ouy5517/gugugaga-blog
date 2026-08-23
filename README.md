@@ -247,6 +247,15 @@ npm run sync:github
 
 标题、技术栈和正文不会被覆盖。遇到 API 限流时，可以在本地 .env 中配置 GITHUB_TOKEN。
 
+### 4.9 QQ 音乐缓存转换工具箱
+
+站点还提供两个工具箱路由：
+
+- `/tools`：工具箱入口，用于查看本地工具。
+- `/tools/qq-music-converter`：QQ 音乐缓存转换器，可将 MFLAC 转为 FLAC、MGG 转为 OGG。
+
+浏览器只会连接本机的桥接服务（`127.0.0.1`），文件不会上传到博客服务器。使用转换器前，请先启动 QQ 音乐客户端，并在本机运行 `bridge/qq-music` 目录构建得到的桥接程序；桥接程序需要附加到正在运行的 QQ 音乐进程以读取缓存。详细的构建、排错与升级说明见 [`bridge/qq-music/README.md`](bridge/qq-music/README.md)。
+
 ## 五、文章和项目如何增加
 
 ### 5.1 新增文章
@@ -338,6 +347,8 @@ npm run dev
 | npm run build | 生成生产构建并同步 RSS、sitemap、robots |
 | npm run preview | 预览 dist 构建结果 |
 | npm run sync:github | 同步勾选了 githubSync 的项目 |
+
+QQ 音乐工具箱的桥接服务维护命令请见 [`bridge/qq-music/README.md`](bridge/qq-music/README.md)。它只应在需要转换的 Windows 电脑本地运行，且 QQ 音乐客户端必须保持运行。
 
 提交前建议至少验证：
 
