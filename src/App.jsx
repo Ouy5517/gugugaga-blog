@@ -5,8 +5,12 @@ import rehypeKatex from "rehype-katex";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import "katex/dist/katex.min.css";
-import { ArrowLeft, ArrowRight, Check, Clock, GithubLogo, List, MagnifyingGlass, X } from "@phosphor-icons/react";
+import { ArrowLeft, ArrowRight, Check, Clock, GithubLogo, MagnifyingGlass } from "@phosphor-icons/react";
 import { categories, findPost, posts, projects, tags } from "./content/content.js";
+import { ArrowLink } from "./components/ArrowLink.jsx";
+import { SiteHeader } from "./components/SiteHeader.jsx";
+import { ToolboxPage } from "./toolbox/ToolboxPage.jsx";
+import { QQMusicConverterPage } from "./toolbox/QQMusicConverterPage.jsx";
 
 function readLocation() {
   const pathname = window.location.pathname.replace(/\/$/, "") || "/";
@@ -101,37 +105,6 @@ function normalizeMathBlocks(source) {
     const [, indent, expression] = match;
     return [`${indent}$$`, `${indent}${expression.trim()}`, `${indent}$$`];
   }).join("\n");
-}
-
-function ArrowLink({ children, onClick, href }) {
-  if (href) return <a className="arrow-link" href={href} target="_blank" rel="noreferrer"><span>{children}</span><ArrowRight size={18} aria-hidden="true" /></a>;
-  return <button className="arrow-link" type="button" onClick={onClick}><span>{children}</span><ArrowRight size={18} aria-hidden="true" /></button>;
-}
-
-function SiteHeader({ onNavigate, animate = false }) {
-  const [menuOpen, setMenuOpen] = useState(false);
-
-  const goSection = (id) => {
-    setMenuOpen(false);
-    if (window.location.pathname !== "/") {
-      onNavigate("/");
-      window.setTimeout(() => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" }), 80);
-      return;
-    }
-    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
-  };
-
-  return <header className={animate ? "site-header header-enter" : "site-header"}>
-    <a className="brand" href="/" onClick={(event) => { event.preventDefault(); setMenuOpen(false); onNavigate("/"); }}><img className="site-avatar" src="/assets/avatar-cat.png" alt="" /><span>咕咕嘎嘎的个人博客</span></a>
-    <nav className={menuOpen ? "nav-links is-open" : "nav-links"} aria-label="主导航">
-      <button type="button" onClick={() => onNavigate("/articles")}>文章</button>
-      <button type="button" onClick={() => goSection("projects")}>项目</button>
-      <button type="button" onClick={() => goSection("about")}>关于</button>
-      <a className="nav-github" href="https://github.com/Ouy5517" target="_blank" rel="noreferrer"><GithubLogo size={16} weight="regular" /> GitHub</a>
-    </nav>
-    <button className="subscribe-nav" type="button" onClick={() => goSection("subscribe")}>订阅</button>
-    <button className="menu-toggle" type="button" aria-label={menuOpen ? "关闭菜单" : "打开菜单"} onClick={() => setMenuOpen(!menuOpen)}>{menuOpen ? <X size={22} /> : <List size={22} />}</button>
-  </header>;
 }
 
 function MarkdownCode({ inline, className, children, ...props }) {
@@ -308,6 +281,7 @@ function HomePage({ onNavigate }) {
       <section className="section" id="articles" data-reveal><div className="section-heading split-heading"><h2>精选技术文章</h2><ArrowLink onClick={() => onNavigate(`/articles/${featured.slug}`)}>阅读全文</ArrowLink></div><article className="featured-card border-trace" onClick={() => onNavigate(`/articles/${featured.slug}`)} role="link" tabIndex="0" onKeyDown={(event) => event.key === "Enter" && onNavigate(`/articles/${featured.slug}`)}><img src={featured.image} alt="文章封面" /><div className="featured-shade" /><div className="featured-content"><p className="meta">{featured.date}&nbsp;&nbsp;·&nbsp;&nbsp;{featured.category}</p><h3>{featured.title}</h3><p>{featured.excerpt}</p><span className="card-read">阅读全文 <ArrowRight size={18} /></span></div></article></section>
       <section className="section" id="recent" data-reveal><div className="section-heading split-heading"><h2>最近文章</h2><ArrowLink onClick={() => onNavigate("/articles")}>查看全部文章</ArrowLink></div><div className="post-grid">{posts.map((post) => <ArticleCard post={post} onNavigate={onNavigate} key={post.slug} />)}</div></section>
       <section className="projects-section" id="projects" data-reveal><div className="section-heading split-heading"><div><p className="eyebrow">BUILDING IN PUBLIC</p><h2>项目</h2></div><ArrowLink href="https://github.com/Ouy5517">查看 GitHub</ArrowLink></div><div className="project-grid">{projects.map((project, index) => <article className="project-card border-trace" key={project.name}><div className="project-card-top"><GithubLogo size={32} weight="regular" /><span className="project-status">{project.status} · PROJECT {String(index + 1).padStart(2, "0")}</span></div><h3>{project.title}</h3><p className="project-name">{project.name}</p><p className="project-description">{project.description}</p><p className="project-detail">{project.detail}</p>{project.githubUpdated && <p className="project-stats">★ {project.githubStars || 0} · Fork {project.githubForks || 0} · 最近更新 {project.githubUpdated}</p>}<div className="project-footer"><div className="stack-list">{project.stack.map((item) => <span key={item}>{item}</span>)}</div><a href={project.url} target="_blank" rel="noreferrer">查看仓库 <ArrowRight size={17} aria-hidden="true" /></a></div></article>)}</div></section>
+      <section className="toolbox-home-section" id="tools" data-reveal><div className="section-heading split-heading"><div><p className="eyebrow">LOCAL UTILITIES</p><h2>工具箱</h2></div><ArrowLink onClick={() => onNavigate("/tools")}>浏览工具箱</ArrowLink></div><article className="toolbox-home-card border-trace"><div><p className="tool-home-kicker">QQ MUSIC CACHE CONVERTER</p><h3>把本地缓存，转换成可播放文件。</h3><p>通过本机桥接服务，将 MFLAC 转为 FLAC、MGG 转为 OGG；文件不上传到互联网。</p><div className="tool-tags"><span>MFLAC → FLAC</span><span>MGG → OGG</span></div></div><button className="primary-button" type="button" onClick={() => onNavigate("/tools/qq-music-converter")}>打开转换工具 <ArrowRight size={18} aria-hidden="true" /></button></article></section>
       <section className="about-card" id="about" data-reveal><img src="/assets/about-forest.png" alt="雾气中的针叶林" /><div className="about-content"><div className="about-profile"><img src="/assets/avatar-cat.png" alt="咕咕嘎嘎的头像" /><span>咕咕嘎嘎</span></div><p className="eyebrow dark-label">ABOUT THIS BLOG</p><h2>关于这个博客</h2><p>这里主要分享计算机学习、技术文章和个人项目，也记录那些值得复盘的实现过程。</p><ArrowLink onClick={() => onNavigate("/articles")}>浏览文章索引</ArrowLink></div></section>
       <section className="subscribe-section" id="subscribe"><div><p className="eyebrow">TECH NOTES · PROJECT LOG</p><h2>订阅技术更新</h2><p>有新的技术文章或项目进展时，我会通过邮件通知你。</p></div>{subscribed ? <div className="success-message" role="status"><Check size={20} weight="bold" /> 已成功订阅，感谢你的关注。</div> : <form onSubmit={handleSubscribe}><label className="sr-only" htmlFor="email">邮箱地址</label><input id="email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="输入你的邮箱地址" required /><button type="submit">订阅</button><small>我们尊重你的隐私，不会发送垃圾邮件。</small></form>}</section>
       <footer><span>© 2026 咕咕嘎嘎的个人博客</span><div className="footer-links"><a href="/feed.xml" target="_blank" rel="noreferrer">RSS</a><a href="https://github.com/Ouy5517" target="_blank" rel="noreferrer"><GithubLogo size={17} /> GitHub</a><button type="button" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}>返回顶部</button></div></footer>
@@ -334,6 +308,8 @@ export function App() {
     return post ? <ArticlePage post={post} onNavigate={navigate} /> : <NotFound onNavigate={navigate} />;
   }
   if (location.pathname === "/articles" || location.pathname === "/archive") return <ArticleLibrary onNavigate={navigate} />;
+  if (location.pathname === "/tools") return <ToolboxPage onNavigate={navigate} />;
+  if (location.toolSlug === "qq-music-converter") return <QQMusicConverterPage onNavigate={navigate} />;
   if (location.pathname !== "/") return <NotFound onNavigate={navigate} />;
   return <HomePage onNavigate={navigate} />;
 }

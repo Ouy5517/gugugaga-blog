@@ -1,6 +1,23 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { createServer } from "vite";
 import { bridgeUrl, formatBytes, statusLabel, targetFor } from "../src/toolbox/qqMusic.js";
+
+let viteServer;
+
+async function loadFrontendModule(pathname) {
+  if (!viteServer) viteServer = await createServer({
+    optimizeDeps: { noDiscovery: true },
+    server: { middlewareMode: true },
+  });
+  return viteServer.ssrLoadModule(pathname);
+}
+
+test.after(async () => {
+  await viteServer?.close();
+});
 
 test("maps supported QQ Music formats", () => {
   assert.equal(targetFor("song.mflac"), ".flac");
@@ -48,4 +65,25 @@ test("preserves the stage returned for each Task 3 job state", () => {
 
 test("caps displayed sizes at gigabytes", () => {
   assert.equal(formatBytes(1024 ** 4), "1024 GB");
+});
+
+test("renders the toolbox route with the QQ Music converter entry point", async () => {
+  const { ToolboxPage } = await loadFrontendModule("/src/toolbox/ToolboxPage.jsx");
+  const html = renderToStaticMarkup(createElement(ToolboxPage, { onNavigate: () => {} }));
+
+  assert.match(html, /工具箱/);
+  assert.match(html, /QQ 音乐缓存转换/);
+  assert.match(html, /MFLAC → FLAC/);
+  assert.match(html, /MGG → OGG/);
+  assert.match(html, /开始转换/);
+});
+
+test("renders the converter dropzone and local-only conversion guidance", async () => {
+  const { QQMusicConverterPage } = await loadFrontendModule("/src/toolbox/QQMusicConverterPage.jsx");
+  const html = renderToStaticMarkup(createElement(QQMusicConverterPage, { onNavigate: () => {} }));
+
+  assert.match(html, /拖放 QQ 音乐缓存文件/);
+  assert.match(html, /选择文件/);
+  assert.match(html, /仅在你的电脑本地处理/);
+  assert.match(html, /桥接服务/);
 });
