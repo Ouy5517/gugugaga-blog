@@ -143,6 +143,18 @@ class BridgeServerTests(unittest.TestCase):
         self.assertEqual(response.headers["Access-Control-Allow-Origin"], LOCAL_DEV_ORIGIN)
         self.assertEqual(response.headers["Access-Control-Allow-Private-Network"], "true")
 
+    def test_health_cors_allows_exact_local_vite_origin_only(self):
+        allowed = self.request("GET", "/api/health", headers={"Origin": LOCAL_DEV_ORIGIN})
+
+        self.assertEqual(allowed.status, 200)
+        self.assertEqual(allowed.headers["Access-Control-Allow-Origin"], LOCAL_DEV_ORIGIN)
+
+        for origin in ("http://127.0.0.1:5173.evil", "https://attacker.example"):
+            with self.subTest(origin=origin):
+                denied = self.request("GET", "/api/health", headers={"Origin": origin})
+                self.assertEqual(denied.status, 200)
+                self.assertNotIn("Access-Control-Allow-Origin", denied.headers)
+
     def test_rejects_invalid_uploads_without_writing_outside_runtime(self):
         for name, body, headers in [
             ("song.mp3", b"encrypted", {}),
