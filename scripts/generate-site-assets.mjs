@@ -64,6 +64,8 @@ const feed = `<?xml version="1.0" encoding="UTF-8"?>\n<rss version="2.0">\n  <ch
 const urls = [
   `${siteUrl}/`,
   `${siteUrl}/articles`,
+  `${siteUrl}/tools`,
+  `${siteUrl}/tools/qq-music-converter`,
   ...posts.map((post) => `${siteUrl}/articles/${encodeURIComponent(post.slug)}`),
 ];
 const sitemap = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map((url) => `  <url><loc>${xml(url)}</loc></url>`).join("\n")}\n</urlset>\n`;

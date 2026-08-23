@@ -1,10 +1,15 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createServer } from "vite";
 import { bridgeUrl, formatBytes, statusLabel, targetFor } from "../src/toolbox/qqMusic.js";
 import { createJobPoller } from "../src/toolbox/jobPolling.js";
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 let viteServer;
 
@@ -137,4 +142,48 @@ test("renders the converter dropzone and local-only conversion guidance", async 
   assert.match(html, /选择文件/);
   assert.match(html, /仅在你的电脑本地处理/);
   assert.match(html, /桥接服务/);
+});
+
+test("publishes toolbox routes in the generated sitemap", () => {
+  const sitemap = fs.readFileSync(path.join(root, "public", "sitemap.xml"), "utf8");
+
+  assert.match(sitemap, /<loc>http:\/\/localhost:5173\/tools<\/loc>/);
+  assert.match(sitemap, /<loc>http:\/\/localhost:5173\/tools\/qq-music-converter<\/loc>/);
+});
+
+test("documents local QQ Music bridge operation and maintenance", () => {
+  const rootReadme = fs.readFileSync(path.join(root, "README.md"), "utf8");
+  const bridgeReadmePath = path.join(root, "bridge", "qq-music", "README.md");
+
+  assert.match(rootReadme, /\/tools/);
+  assert.match(rootReadme, /\/tools\/qq-music-converter/);
+  assert.match(rootReadme, /本地/);
+  assert.match(rootReadme, /QQ 音乐.*运行|运行.*QQ 音乐/);
+  assert.ok(fs.existsSync(bridgeReadmePath), "bridge README must exist");
+  const bridgeReadme = fs.readFileSync(bridgeReadmePath, "utf8");
+  assert.match(bridgeReadme, /python -m unittest discover -s bridge\/qq-music\/tests -v/);
+  assert.match(bridgeReadme, /powershell -ExecutionPolicy Bypass -File bridge\/qq-music\/build\.ps1/);
+  assert.match(bridgeReadme, /dist\\qq-music-bridge\.exe/);
+  assert.match(bridgeReadme, /DLL/);
+  assert.match(bridgeReadme, /hook symbols|Hook symbols|挂钩符号|符号/);
+});
+
+test("defines a Windows release workflow with the public bridge filename", () => {
+  const workflowPath = path.join(root, ".github", "workflows", "qq-music-bridge-release.yml");
+
+  assert.ok(fs.existsSync(workflowPath), "release workflow must exist");
+  const workflow = fs.readFileSync(workflowPath, "utf8");
+  assert.match(workflow, /workflow_dispatch:/);
+  assert.match(workflow, /qq-music-bridge-v\*/);
+  assert.match(workflow, /runs-on: windows-latest/);
+  assert.match(workflow, /actions\/checkout@v4/);
+  assert.match(workflow, /actions\/setup-python@v5/);
+  assert.match(workflow, /python-version: ["']3\.12["']/);
+  assert.match(workflow, /requirements-build\.txt/);
+  assert.match(workflow, /python -m unittest discover -s bridge\/qq-music\/tests -v/);
+  assert.match(workflow, /\.\/bridge\/qq-music\/build\.ps1/);
+  assert.match(workflow, /actions\/upload-artifact@v4/);
+  assert.match(workflow, /path: dist\/qq-music-bridge\.exe/);
+  assert.match(workflow, /softprops\/action-gh-release@v2/);
+  assert.match(workflow, /files: dist\/qq-music-bridge\.exe/);
 });

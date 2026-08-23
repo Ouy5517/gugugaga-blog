@@ -1,0 +1,30 @@
+name: QQ Music Bridge Release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "qq-music-bridge-v*"
+
+jobs:
+  build:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install -r bridge/qq-music/requirements-build.txt
+      - run: python -m unittest discover -s bridge/qq-music/tests -v
+      - shell: powershell
+        run: ./bridge/qq-music/build.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: qq-music-bridge
+          path: dist/qq-music-bridge.exe
+      - uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/qq-music-bridge-v')
+        with:
+          files: dist/qq-music-bridge.exe
