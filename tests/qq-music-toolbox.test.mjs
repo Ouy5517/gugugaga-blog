@@ -284,6 +284,7 @@ test("defines a least-privilege, immutable Windows release workflow", () => {
   assert.equal(download?.with?.path, "dist");
   const releaseCommand = release.steps.find((step) => step.env?.GH_TOKEN);
   assert.equal(releaseCommand?.env?.GH_TOKEN, "${{ secrets.GITHUB_TOKEN }}");
+  assert.equal(releaseCommand?.env?.GH_REPO, "${{ github.repository }}");
   const releaseScript = releaseCommand?.run || "";
   const viewPositions = [...releaseScript.matchAll(/gh release view/g)].map((match) => match.index);
   const createPosition = releaseScript.indexOf("gh release create");
