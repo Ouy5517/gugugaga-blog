@@ -1,6 +1,7 @@
 node_modules/
 .npm-cache/
 dist/
+.worktrees/
 .env
 .env.*
 !.env.example
