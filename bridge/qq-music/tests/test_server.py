@@ -7,6 +7,7 @@ import tempfile
 import threading
 import time
 import unittest
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -186,3 +187,10 @@ class BridgeServerTests(unittest.TestCase):
     def test_rejects_non_loopback_listener(self):
         with self.assertRaises(ValueError):
             create_server("0.0.0.0", 0, self.root, converter=self.fake_converter)
+
+    def test_failed_bind_shuts_down_the_created_job_manager(self):
+        with patch("bridge.server.JobManager") as manager, patch("bridge.server.BridgeHTTPServer", side_effect=OSError(10048, "address already in use")):
+            with self.assertRaises(OSError):
+                create_server("127.0.0.1", 0, self.root, converter=self.fake_converter)
+
+        manager.return_value.shutdown.assert_called_once_with()

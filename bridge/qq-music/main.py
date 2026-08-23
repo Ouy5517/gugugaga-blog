@@ -48,8 +48,15 @@ def _wait_for_health(timeout: float = 5) -> bool:
     return False
 
 
-def main(open_browser: bool = True) -> None:
-    server = build_server()
+def main(open_browser: bool = True) -> int:
+    try:
+        server = build_server()
+    except OSError as error:
+        if error.errno == 10048:
+            print("本地服务端口 8765 已被占用，请关闭占用该端口的程序后重试。")
+        else:
+            print(f"无法启动 QQ 音乐转换服务：{error}")
+        return 1
     thread = threading.Thread(target=server.serve_forever, name="qq-music-bridge", daemon=True)
     thread.start()
     print(f"QQ 音乐转换服务已启动：{BRIDGE_URL}")
@@ -64,10 +71,15 @@ def main(open_browser: bool = True) -> None:
         server.server_close()
         server.job_manager.shutdown()
         thread.join(timeout=5)
+    return 0
+
+
+def run_cli(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="QQ 音乐转换本地桥接服务")
+    parser.add_argument("--no-browser", action="store_true", help="启动后不打开网页工具")
+    args = parser.parse_args(argv)
+    return main(open_browser=not args.no_browser)
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="QQ 音乐转换本地桥接服务")
-    parser.add_argument("--no-browser", action="store_true", help="启动后不打开网页工具")
-    args = parser.parse_args()
-    main(open_browser=not args.no_browser)
+    raise SystemExit(run_cli())

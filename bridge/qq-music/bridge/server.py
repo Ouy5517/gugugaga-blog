@@ -229,7 +229,11 @@ def create_server(host, port, data_root, hook_path=None, converter=None, process
     if process_probe is None:
         process_probe = lambda: False
     manager = JobManager(converter, output_dir, incoming_dir)
-    httpd = BridgeHTTPServer((host, port), BridgeRequestHandler)
+    try:
+        httpd = BridgeHTTPServer((host, port), BridgeRequestHandler)
+    except OSError:
+        manager.shutdown()
+        raise
     httpd.job_manager = manager
     httpd.incoming_dir = incoming_dir
     httpd.output_dir = output_dir
