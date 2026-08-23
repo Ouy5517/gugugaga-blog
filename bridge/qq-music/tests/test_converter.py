@@ -2,6 +2,7 @@ import sys
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -21,27 +22,33 @@ class FakeProcess:
 
 
 class FakeExports:
+    def __init__(self, frida):
+        self.frida = frida
+
     def decrypt(self, source_path, temporary_path):
         Path(temporary_path).write_bytes(b"decoded")
+        if self.frida.decrypt_error:
+            raise self.frida.decrypt_error
 
 
 class FakeScript:
-    def __init__(self, source):
+    def __init__(self, source, frida):
         self.source = source
         self.loaded = False
-        self.exports_sync = FakeExports()
+        self.exports_sync = FakeExports(frida)
 
     def load(self):
         self.loaded = True
 
 
 class FakeSession:
-    def __init__(self):
+    def __init__(self, frida):
+        self.frida = frida
         self.script = None
         self.detached = False
 
     def create_script(self, source):
-        self.script = FakeScript(source)
+        self.script = FakeScript(source, self.frida)
         return self.script
 
     def detach(self):
@@ -52,8 +59,9 @@ class FakeFrida:
     def __init__(self):
         self.attached_process = None
         self.attach_error = None
+        self.decrypt_error = None
         self.process_names = []
-        self.session = FakeSession()
+        self.session = FakeSession(self)
 
     def attach(self, process_name):
         if self.attach_error:
@@ -144,6 +152,41 @@ class FridaConverterTests(unittest.TestCase):
 
         with self.assertRaisesRegex(ConversionError, "找不到 hook_qq_music.js"):
             converter.convert(self.source, self.source.name, self.output)
+
+    def test_converter_detaches_when_temporary_cleanup_fails(self):
+        self.fake_frida.decrypt_error = RuntimeError("decrypt failed")
+
+        def deny_temporary_file_cleanup(path):
+            if path.suffix == ".decrypting":
+                raise OSError(f"cleanup denied: {path}")
+            return original_unlink(path)
+
+        original_unlink = Path.unlink
+        with patch("bridge.converter.Path.unlink", new=deny_temporary_file_cleanup):
+            with self.assertRaisesRegex(ConversionError, "转换失败") as context:
+                self.converter.convert(self.source, self.source.name, self.output)
+
+        self.assertTrue(self.fake_frida.session.detached)
+        self.assertNotIn(str(self.runtime), str(context.exception))
+
+    def test_converter_hides_output_directory_creation_failure(self):
+        invalid_output = self.root / "not-a-directory"
+        invalid_output.write_bytes(b"not a directory")
+
+        with self.assertRaisesRegex(ConversionError, "无法准备转换目录") as context:
+            self.converter.convert(self.source, self.source.name, invalid_output)
+
+        self.assertNotIn(str(invalid_output), str(context.exception))
+
+    def test_converter_hides_runtime_directory_creation_failure(self):
+        invalid_runtime = self.root / "not-a-directory"
+        invalid_runtime.write_bytes(b"not a directory")
+        converter = FridaConverter(self.hook, invalid_runtime, self.fake_frida)
+
+        with self.assertRaisesRegex(ConversionError, "无法准备转换目录") as context:
+            converter.convert(self.source, self.source.name, self.output)
+
+        self.assertNotIn(str(invalid_runtime), str(context.exception))
 
     def test_process_probe_reports_qq_music(self):
         self.fake_frida.process_names = ["explorer.exe", "QQMusic.exe"]

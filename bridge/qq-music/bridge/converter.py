@@ -94,7 +94,12 @@ class FridaConverter:
         output_dir: str | Path,
         progress: Callable[[int, str], None] | None = None,
     ) -> Path:
-        plan = ConversionPlan.create(source_path, source_name, output_dir, self.runtime_dir)
+        try:
+            plan = ConversionPlan.create(source_path, source_name, output_dir, self.runtime_dir)
+        except ConversionError:
+            raise
+        except OSError as error:
+            raise ConversionError("无法准备转换目录") from error
         if not plan.conversion_needed:
             return plan.output_path
         if not self.hook_path.is_file():
@@ -123,10 +128,14 @@ class FridaConverter:
                 raise ConversionError("无法连接 QQ 音乐，请确认 QQ 音乐正在运行") from error
             raise ConversionError("转换失败，请确认文件和 QQ 音乐状态后重试") from error
         finally:
-            if plan.temporary_path.exists():
-                plan.temporary_path.unlink()
-            if session is not None:
-                try:
-                    session.detach()
-                except Exception:
-                    pass
+            try:
+                if plan.temporary_path.exists():
+                    plan.temporary_path.unlink()
+            except OSError:
+                pass
+            finally:
+                if session is not None:
+                    try:
+                        session.detach()
+                    except Exception:
+                        pass
