@@ -1,0 +1,2 @@
+frida==16.6.6
+pyinstaller==6.15.0

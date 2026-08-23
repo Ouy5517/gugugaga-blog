@@ -5,3 +5,6 @@ dist/
 .env
 .env.*
 !.env.example
+/build/
+/dist/
+*.spec
