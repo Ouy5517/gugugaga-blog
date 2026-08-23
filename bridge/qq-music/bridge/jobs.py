@@ -60,7 +60,7 @@ class JobManager:
         self._jobs: dict[str, Job] = {}
         self._jobs_lock = threading.Lock()
         self._queue: Queue[Job | None] = Queue()
-        self._shutdown_lock = threading.Lock()
+        self._lifecycle_lock = threading.Lock()
         self._stopped = False
         self._worker = threading.Thread(target=self._work, name="qq-music-converter", daemon=True)
         self._worker.start()
@@ -73,11 +73,12 @@ class JobManager:
             source_path=Path(source_path),
             target_name=target_name(clean_name),
         )
-        with self._jobs_lock:
+        with self._lifecycle_lock:
             if self._stopped:
                 raise RuntimeError("转换服务不可用")
-            self._jobs[job.job_id] = job
-        self._queue.put(job)
+            with self._jobs_lock:
+                self._jobs[job.job_id] = job
+            self._queue.put(job)
         return job
 
     def get(self, job_id: str) -> Job | None:
@@ -85,11 +86,10 @@ class JobManager:
             return self._jobs.get(job_id)
 
     def shutdown(self) -> None:
-        with self._shutdown_lock:
-            if self._stopped:
-                return
-            self._stopped = True
-            self._queue.put(None)
+        with self._lifecycle_lock:
+            if not self._stopped:
+                self._stopped = True
+                self._queue.put(None)
         self._worker.join(timeout=5)
 
     def _work(self) -> None:
@@ -116,8 +116,10 @@ class JobManager:
             job.status = "converting"
             job.stage = "正在转换"
         try:
-            result = Path(self.converter(job.source_path, job.source_name, self.output_dir, progress))
-            if not result.is_file() or not _is_within(result, self.output_dir):
+            job_output_dir = self.output_dir / job.job_id
+            job_output_dir.mkdir(parents=True, exist_ok=True)
+            result = Path(self.converter(job.source_path, job.source_name, job_output_dir, progress))
+            if not result.is_file() or not _is_within(result, job_output_dir):
                 raise RuntimeError("invalid conversion output")
             with job.lock:
                 job.output_path = result
@@ -132,5 +134,9 @@ class JobManager:
         finally:
             try:
                 job.source_path.unlink(missing_ok=True)
+            except OSError:
+                pass
+            try:
+                job.source_path.parent.rmdir()
             except OSError:
                 pass

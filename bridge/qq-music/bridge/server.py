@@ -162,6 +162,10 @@ class BridgeRequestHandler(BaseHTTPRequestHandler):
                 source_path.unlink(missing_ok=True)
             except OSError:
                 pass
+            try:
+                job_dir.rmdir()
+            except OSError:
+                pass
             self._error(500, "无法保存上传文件")
             return
         self._send_json(202, job.to_dict())

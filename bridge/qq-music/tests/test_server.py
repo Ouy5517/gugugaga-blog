@@ -89,6 +89,28 @@ class BridgeServerTests(unittest.TestCase):
         self.assertEqual(download.status, 200)
         self.assertEqual(download.body, b"decoded")
 
+    def test_same_named_uploads_receive_their_own_output(self):
+        self.server.shutdown()
+        self.server.server_close()
+        self.thread.join(timeout=2)
+
+        def reuse_if_present(source_path, source_name, output_dir, _progress):
+            target = output_dir / f"{Path(source_name).stem}.flac"
+            if not target.exists():
+                target.write_bytes(source_path.read_bytes())
+            return target
+
+        self.server = create_server("127.0.0.1", 0, self.root, converter=reuse_if_present)
+        self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
+        self.thread.start()
+        first_id = json.loads(self.upload(body=b"first-owner").body)["jobId"]
+        second_id = json.loads(self.upload(body=b"second-owner").body)["jobId"]
+        self.assertEqual(self.wait_for_job(first_id)["status"], "completed")
+        self.assertEqual(self.wait_for_job(second_id)["status"], "completed")
+
+        self.assertEqual(self.request("GET", f"/api/download/{first_id}").body, b"first-owner")
+        self.assertEqual(self.request("GET", f"/api/download/{second_id}").body, b"second-owner")
+
     def test_preflight_allows_only_blog_origin(self):
         allowed = self.request("OPTIONS", "/api/convert", headers={
             "Origin": BLOG_ORIGIN,

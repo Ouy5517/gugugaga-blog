@@ -1,9 +1,11 @@
 import sys
 from pathlib import Path
+import queue
 import tempfile
 import threading
 import time
 import unittest
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -98,3 +100,60 @@ class JobManagerTests(unittest.TestCase):
         self.assertTrue(wait_until(lambda: job.status == "failed"))
         self.assertNotIn("downloadUrl", job.to_dict())
         self.assertNotIn(str(self.root), job.to_dict()["error"])
+
+    def test_worker_removes_its_empty_incoming_job_directory(self):
+        job_dir = self.incoming_dir / "job-under-test"
+        job_dir.mkdir(parents=True)
+        source = job_dir / "song.mflac"
+        source.write_bytes(b"encrypted")
+
+        def converter(_source_path, _source_name, output_dir, _progress):
+            target = output_dir / "song.flac"
+            target.write_bytes(b"decoded")
+            return target
+
+        manager = self.make_manager(converter)
+        job = manager.submit(source.name, source)
+
+        self.assertTrue(wait_until(lambda: job.status == "completed"))
+        self.assertFalse(job_dir.exists())
+        self.assertEqual(list(self.incoming_dir.iterdir()), [])
+
+    def test_shutdown_waits_for_an_accepted_job_and_cleans_its_source(self):
+        class PausingQueue(queue.Queue):
+            job_put_started = threading.Event()
+            allow_job_put = threading.Event()
+
+            def put(self, item, *args, **kwargs):
+                if item is not None:
+                    self.job_put_started.set()
+                    self.allow_job_put.wait(timeout=2)
+                return super().put(item, *args, **kwargs)
+
+        source = self.root / "song.mflac"
+        source.write_bytes(b"encrypted")
+
+        def converter(_source_path, _source_name, output_dir, _progress):
+            target = output_dir / "song.flac"
+            target.write_bytes(b"decoded")
+            return target
+
+        with patch("bridge.jobs.Queue", PausingQueue):
+            manager = self.make_manager(converter)
+            submitted = []
+            submitter = threading.Thread(target=lambda: submitted.append(manager.submit(source.name, source)))
+            submitter.start()
+            self.assertTrue(manager._queue.job_put_started.wait(timeout=2))
+            shutdown_started = threading.Event()
+            shutdown_thread = threading.Thread(target=lambda: (shutdown_started.set(), manager.shutdown()))
+            shutdown_thread.start()
+            self.assertTrue(shutdown_started.wait(timeout=2))
+            time.sleep(0.05)
+            self.assertTrue(shutdown_thread.is_alive())
+            manager._queue.allow_job_put.set()
+            submitter.join(timeout=2)
+            shutdown_thread.join(timeout=2)
+
+        self.assertEqual(len(submitted), 1)
+        self.assertEqual(submitted[0].status, "completed")
+        self.assertFalse(source.exists())
