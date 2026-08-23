@@ -10,7 +10,7 @@ test("maps supported QQ Music formats", () => {
 
 test("builds bridge URLs and status labels", () => {
   assert.equal(bridgeUrl("api/health"), "http://127.0.0.1:8765/api/health");
-  assert.equal(statusLabel("processing", "正在连接 QQ 音乐"), "正在连接 QQ 音乐");
+  assert.equal(statusLabel("converting", "正在连接 QQ 音乐"), "正在连接 QQ 音乐");
   assert.equal(statusLabel("completed"), "已完成");
 });
 
@@ -27,11 +27,23 @@ test("keeps bridge requests local while encoding non-ASCII path content", () => 
   assert.equal(bridgeUrl("https://example.test/api"), "http://127.0.0.1:8765/https://example.test/api");
 });
 
-test("uses fallback labels for queue and failed states", () => {
-  assert.equal(statusLabel("queued"), "等待处理");
-  assert.equal(statusLabel("processing"), "转换中");
+test("uses Task 3 fallback labels for every job status", () => {
+  assert.equal(statusLabel("queued"), "等待转换");
+  assert.equal(statusLabel("converting"), "正在转换");
+  assert.equal(statusLabel("completed"), "已完成");
   assert.equal(statusLabel("failed"), "转换失败");
   assert.equal(statusLabel("other"), "状态未知");
+});
+
+test("preserves the stage returned for each Task 3 job state", () => {
+  for (const [status, stage] of [
+    ["queued", "等待转换"],
+    ["converting", "正在读取缓存"],
+    ["completed", "转换完成"],
+    ["failed", "转换失败"],
+  ]) {
+    assert.equal(statusLabel(status, stage), stage);
+  }
 });
 
 test("caps displayed sizes at gigabytes", () => {

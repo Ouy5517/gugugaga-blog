@@ -6,8 +6,8 @@ const FORMAT_TARGETS = Object.freeze({
 });
 
 const STATUS_LABELS = Object.freeze({
-  queued: "等待处理",
-  processing: "转换中",
+  queued: "等待转换",
+  converting: "正在转换",
   completed: "已完成",
   failed: "转换失败",
 });
@@ -40,6 +40,6 @@ export function bridgeUrl(pathname) {
 }
 
 export function statusLabel(status, stage) {
-  if (status === "processing" && typeof stage === "string" && stage.trim()) return stage;
+  if (typeof stage === "string" && stage.trim()) return stage;
   return STATUS_LABELS[status] || "状态未知";
 }
