@@ -9,7 +9,10 @@ from .converter import ConversionError, FridaConverter, safe_source_name
 from .jobs import JobManager
 
 
-ALLOWED_ORIGINS = {"https://gugugaga-blog.netlify.app"}
+ALLOWED_ORIGINS = {
+    "https://gugugaga-blog.netlify.app",
+    "http://127.0.0.1:5173",
+}
 MAX_UPLOAD_BYTES = 1024 * 1024 * 1024
 
 

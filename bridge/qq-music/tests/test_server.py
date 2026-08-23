@@ -16,6 +16,7 @@ from bridge.server import MAX_UPLOAD_BYTES, create_server
 
 
 BLOG_ORIGIN = "https://gugugaga-blog.netlify.app"
+LOCAL_DEV_ORIGIN = "http://127.0.0.1:5173"
 
 
 class BridgeServerTests(unittest.TestCase):
@@ -129,6 +130,18 @@ class BridgeServerTests(unittest.TestCase):
         })
         self.assertNotIn("Access-Control-Allow-Origin", denied.headers)
         self.assertNotIn("Access-Control-Allow-Private-Network", denied.headers)
+
+    def test_preflight_allows_local_vite_origin(self):
+        response = self.request("OPTIONS", "/api/convert", headers={
+            "Origin": LOCAL_DEV_ORIGIN,
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "content-type,x-file-name",
+            "Access-Control-Request-Private-Network": "true",
+        })
+
+        self.assertEqual(response.status, 204)
+        self.assertEqual(response.headers["Access-Control-Allow-Origin"], LOCAL_DEV_ORIGIN)
+        self.assertEqual(response.headers["Access-Control-Allow-Private-Network"], "true")
 
     def test_rejects_invalid_uploads_without_writing_outside_runtime(self):
         for name, body, headers in [
