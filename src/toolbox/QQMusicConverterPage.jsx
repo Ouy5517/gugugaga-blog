@@ -1,6 +1,7 @@
 import { ArrowLeft, ArrowClockwise, CheckCircle, DownloadSimple, FileArrowUp, MusicNotes, Trash, WarningCircle, XCircle } from "@phosphor-icons/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { SiteHeader } from "../components/SiteHeader.jsx";
+import { createJobPoller } from "./jobPolling.js";
 import { bridgeUrl, formatBytes, statusLabel, targetFor } from "./qqMusic.js";
 
 const HEALTH_INTERVAL_MS = 12_000;
@@ -31,16 +32,18 @@ export function QQMusicConverterPage({ onNavigate }) {
   const [queue, setQueue] = useState([]);
   const [notice, setNotice] = useState("");
   const inputRef = useRef(null);
-  const pollTimers = useRef(new Map());
+  const pollers = useRef(new Map());
+  const submittingIds = useRef(new Set());
+  const mountedRef = useRef(true);
 
   const updateItem = useCallback((id, patch) => {
+    if (!mountedRef.current) return;
     setQueue((items) => items.map((item) => item.id === id ? { ...item, ...patch } : item));
   }, []);
 
   const clearPoll = useCallback((id) => {
-    const timer = pollTimers.current.get(id);
-    if (timer) window.clearInterval(timer);
-    pollTimers.current.delete(id);
+    pollers.current.get(id)?.stop();
+    pollers.current.delete(id);
   }, []);
 
   const checkHealth = useCallback(async () => {
@@ -48,45 +51,63 @@ export function QQMusicConverterPage({ onNavigate }) {
       const response = await fetch(bridgeUrl("/api/health"), bridgeRequestOptions);
       if (!response.ok) throw new Error("桥接服务没有响应");
       const data = await response.json();
+      if (!mountedRef.current) return;
       setHealth({ state: "online", qqMusicRunning: Boolean(data.qqMusicRunning), version: data.version || "" });
     } catch {
+      if (!mountedRef.current) return;
       setHealth({ state: "offline", qqMusicRunning: false, version: "" });
     }
   }, []);
 
   useEffect(() => {
+    mountedRef.current = true;
     checkHealth();
     const interval = window.setInterval(checkHealth, HEALTH_INTERVAL_MS);
-    return () => window.clearInterval(interval);
+    return () => {
+      mountedRef.current = false;
+      window.clearInterval(interval);
+    };
   }, [checkHealth]);
 
   useEffect(() => () => {
-    pollTimers.current.forEach((timer) => window.clearInterval(timer));
-    pollTimers.current.clear();
+    pollers.current.forEach((poller) => poller.stop());
+    pollers.current.clear();
+    submittingIds.current.clear();
   }, []);
 
   const pollJob = useCallback((item) => {
     clearPoll(item.id);
-    const poll = async () => {
-      try {
+    const poller = createJobPoller({
+      fetchJob: async () => {
         const response = await fetch(bridgeUrl(`/api/jobs/${encodeURIComponent(item.jobId)}`), bridgeRequestOptions);
         if (!response.ok) throw new Error("无法读取转换进度");
-        const data = await response.json();
+        return response.json();
+      },
+      onUpdate: (data) => {
         const status = data.status || "converting";
         const patch = { status, progress: Number.isFinite(data.progress) ? data.progress : 0, stage: statusLabel(status, data.stage), error: data.error || "" };
         if (status === "completed") patch.downloadUrl = jobDownloadUrl(data.downloadUrl);
         updateItem(item.id, patch);
-        if (status === "completed" || status === "failed") clearPoll(item.id);
-      } catch (error) {
+        if (status === "completed" || status === "failed") {
+          pollers.current.delete(item.id);
+          submittingIds.current.delete(item.id);
+        }
+      },
+      onError: (error) => {
         updateItem(item.id, { status: "failed", stage: "转换失败", error: error.message || "无法读取转换进度" });
         clearPoll(item.id);
-      }
-    };
-    poll();
-    pollTimers.current.set(item.id, window.setInterval(poll, JOB_INTERVAL_MS));
+        submittingIds.current.delete(item.id);
+      },
+      intervalMs: JOB_INTERVAL_MS,
+    });
+    pollers.current.set(item.id, poller);
+    poller.start();
   }, [clearPoll, updateItem]);
 
   const submitItem = useCallback(async (item) => {
+    if (submittingIds.current.has(item.id)) return;
+    clearPoll(item.id);
+    submittingIds.current.add(item.id);
     updateItem(item.id, { status: "queued", progress: 0, stage: "等待转换", error: "", downloadUrl: "" });
     try {
       const response = await fetch(bridgeUrl("/api/convert"), {
@@ -99,13 +120,18 @@ export function QQMusicConverterPage({ onNavigate }) {
       const data = await response.json();
       const jobId = data.jobId || data.id;
       if (!jobId) throw new Error("桥接服务没有返回任务编号");
+      if (!mountedRef.current) {
+        submittingIds.current.delete(item.id);
+        return;
+      }
       const queuedItem = { ...item, jobId };
       updateItem(item.id, { status: data.status || "queued", stage: statusLabel(data.status || "queued", data.stage), jobId });
       pollJob(queuedItem);
     } catch (error) {
       updateItem(item.id, { status: "failed", stage: "转换失败", error: error.message || "无法提交转换" });
+      submittingIds.current.delete(item.id);
     }
-  }, [pollJob, updateItem]);
+  }, [clearPoll, pollJob, updateItem]);
 
   const submitQueue = () => {
     const eligible = queue.filter((item) => item.status === "ready" || item.status === "failed");
@@ -133,11 +159,13 @@ export function QQMusicConverterPage({ onNavigate }) {
   const removeItem = (item) => {
     if (item.status !== "ready" && item.status !== "failed") return;
     clearPoll(item.id);
+    submittingIds.current.delete(item.id);
     setQueue((items) => items.filter((candidate) => candidate.id !== item.id));
   };
 
   const retryItem = (item) => {
     clearPoll(item.id);
+    submittingIds.current.delete(item.id);
     updateItem(item.id, { status: "ready", progress: 0, stage: "等待转换", error: "", jobId: "", downloadUrl: "" });
   };
 

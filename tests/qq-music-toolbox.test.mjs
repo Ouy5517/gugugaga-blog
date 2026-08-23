@@ -4,6 +4,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createServer } from "vite";
 import { bridgeUrl, formatBytes, statusLabel, targetFor } from "../src/toolbox/qqMusic.js";
+import { createJobPoller } from "../src/toolbox/jobPolling.js";
 
 let viteServer;
 
@@ -65,6 +66,56 @@ test("preserves the stage returned for each Task 3 job state", () => {
 
 test("caps displayed sizes at gigabytes", () => {
   assert.equal(formatBytes(1024 ** 4), "1024 GB");
+});
+
+test("polls one job request at a time and stops after a terminal response", async () => {
+  const scheduled = [];
+  const updates = [];
+  const first = Promise.withResolvers();
+  const second = Promise.withResolvers();
+  const responses = [first.promise, second.promise];
+  let calls = 0;
+  const poller = createJobPoller({
+    fetchJob: () => responses[calls++],
+    onUpdate: (job) => updates.push(job.status),
+    setTimeoutFn: (callback) => { scheduled.push(callback); return callback; },
+    clearTimeoutFn: (callback) => { const index = scheduled.indexOf(callback); if (index >= 0) scheduled.splice(index, 1); },
+  });
+
+  poller.start();
+  assert.equal(calls, 1);
+  assert.equal(scheduled.length, 0, "a slow request must not overlap with another request");
+
+  first.resolve({ status: "converting" });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(scheduled.length, 1);
+  scheduled.shift()();
+  assert.equal(calls, 2);
+
+  second.resolve({ status: "completed" });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(updates, ["converting", "completed"]);
+  assert.equal(scheduled.length, 0, "completed jobs must not be polled again");
+});
+
+test("ignores an in-flight job response after the poller is stopped", async () => {
+  const pending = Promise.withResolvers();
+  const updates = [];
+  const scheduled = [];
+  const poller = createJobPoller({
+    fetchJob: () => pending.promise,
+    onUpdate: (job) => updates.push(job.status),
+    setTimeoutFn: (callback) => { scheduled.push(callback); return callback; },
+    clearTimeoutFn: (callback) => { const index = scheduled.indexOf(callback); if (index >= 0) scheduled.splice(index, 1); },
+  });
+
+  poller.start();
+  poller.stop();
+  pending.resolve({ status: "completed" });
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.deepEqual(updates, []);
+  assert.equal(scheduled.length, 0);
 });
 
 test("renders the toolbox route with the QQ Music converter entry point", async () => {
