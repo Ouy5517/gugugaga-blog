@@ -17,9 +17,12 @@ TOOL_URL = "https://gugugaga-blog.netlify.app/tools/qq-music-converter"
 
 def _safe_print(message: str) -> None:
     """Print status text without crashing on legacy Windows consoles."""
-    encoding = getattr(sys.stdout, "encoding", None) or "utf-8"
-    safe_message = message.encode(encoding, errors="replace").decode(encoding)
-    print(safe_message)
+    try:
+        print(message)
+    except UnicodeEncodeError:
+        encoding = getattr(sys.stdout, "encoding", None) or "utf-8"
+        safe_message = message.encode(encoding, errors="replace").decode(encoding)
+        print(safe_message)
 
 
 def resource_path(relative: str) -> Path:
