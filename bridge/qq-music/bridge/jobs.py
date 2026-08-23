@@ -5,7 +5,7 @@ import threading
 from typing import Callable
 from uuid import uuid4
 
-from .converter import safe_source_name, target_name
+from .converter import ConversionError, DEFAULT_CONVERSION_ERROR, safe_conversion_error_message, safe_source_name, target_name
 
 
 ProgressCallback = Callable[[int, str], None]
@@ -126,11 +126,16 @@ class JobManager:
                 job.status = "completed"
                 job.progress = 100
                 job.stage = "转换完成"
+        except ConversionError as error:
+            with job.lock:
+                job.status = "failed"
+                job.stage = "转换失败"
+                job.error = safe_conversion_error_message(error)
         except Exception:
             with job.lock:
                 job.status = "failed"
                 job.stage = "转换失败"
-                job.error = "转换失败，请确认文件和 QQ 音乐状态后重试"
+                job.error = DEFAULT_CONVERSION_ERROR
         finally:
             try:
                 job.source_path.unlink(missing_ok=True)

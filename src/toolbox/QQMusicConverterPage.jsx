@@ -2,7 +2,7 @@ import { ArrowLeft, ArrowClockwise, CheckCircle, DownloadSimple, FileArrowUp, Mu
 import { useCallback, useEffect, useRef, useState } from "react";
 import { SiteHeader } from "../components/SiteHeader.jsx";
 import { createJobPoller } from "./jobPolling.js";
-import { bridgeUrl, formatBytes, statusLabel, targetFor } from "./qqMusic.js";
+import { bridgeUrl, formatBytes, selectQQMusicFiles, statusLabel, targetFor } from "./qqMusic.js";
 
 const HEALTH_INTERVAL_MS = 12_000;
 const JOB_INTERVAL_MS = 650;
@@ -25,6 +25,43 @@ function queueItemFor(file) {
 
 function jobDownloadUrl(downloadUrl) {
   return downloadUrl ? bridgeUrl(downloadUrl) : "";
+}
+
+export function BridgeStatus({ health, onRetry }) {
+  return <section className={`tool-status is-${health.state}`} role="status" aria-live="polite" aria-atomic="true">
+    {health.state === "checking" && <><MusicNotes size={20} aria-hidden="true" /><div><strong>正在检查桥接服务</strong><span>正在连接本机 127.0.0.1:8765…</span></div></>}
+    {health.state === "online" && <><CheckCircle size={20} aria-hidden="true" /><div><strong>桥接服务已启动{health.version ? ` · v${health.version}` : ""}</strong><span>{health.qqMusicRunning ? "QQ 音乐已运行" : "请先启动 QQ 音乐"}</span></div></>}
+    {health.state === "offline" && <><WarningCircle size={20} aria-hidden="true" /><div><strong>桥接服务未启动</strong><span>启动 QQ Music Bridge 后可点“重新检测”，页面也会自动重检。</span></div><nav className="tool-status-actions" aria-label="桥接服务操作"><button className="tool-text-button" type="button" onClick={onRetry}>重新检测</button><a href={releaseUrl}>下载 QQ Music Bridge</a></nav></>}
+  </section>;
+}
+
+export function QueueJobStatus({ item }) {
+  const progress = Math.max(0, Math.min(100, Number.isFinite(item.progress) ? item.progress : 0));
+  const isActive = item.status === "queued" || item.status === "converting";
+  const announceStage = isActive || item.status === "completed";
+
+  return <div className="tool-job-meta">
+    <span role={announceStage ? "status" : undefined} aria-live={announceStage ? "polite" : undefined} aria-atomic={announceStage ? "true" : undefined}>{statusLabel(item.status, item.stage)}</span>
+    {isActive && <div className="tool-progress" role="progressbar" aria-label={`${item.file.name} 转换进度`} aria-valuemin="0" aria-valuemax="100" aria-valuenow={progress}><span style={{ width: `${progress}%` }} /></div>}
+    {item.error && <small role="alert">{item.error}</small>}
+  </div>;
+}
+
+export function ConversionInstructions({ online }) {
+  if (online) {
+    return <aside className="tool-instructions is-compact">
+      <p className="eyebrow">LOCAL PROCESSING</p>
+      <h2>本地处理</h2>
+      <p>桥接服务已就绪；所选文件只在你的电脑本地处理。</p>
+    </aside>;
+  }
+
+  return <aside className="tool-instructions">
+    <p className="eyebrow">HOW IT WORKS</p>
+    <h2>首次使用</h2>
+    <ol><li>启动 QQ 音乐并保持登录。</li><li>启动 QQ Music Bridge，然后确认上方状态变为在线。</li><li>选择缓存文件，转换完成后下载结果。</li></ol>
+    <p>仅在你的电脑本地处理，页面只会请求本机桥接服务。</p>
+  </aside>;
 }
 
 export function QQMusicConverterPage({ onNavigate }) {
@@ -58,6 +95,11 @@ export function QQMusicConverterPage({ onNavigate }) {
       setHealth({ state: "offline", qqMusicRunning: false, version: "" });
     }
   }, []);
+
+  const retryHealth = useCallback(() => {
+    setHealth({ state: "checking", qqMusicRunning: false, version: "" });
+    checkHealth();
+  }, [checkHealth]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -140,20 +182,17 @@ export function QQMusicConverterPage({ onNavigate }) {
   };
 
   const addFiles = (files) => {
-    const selected = Array.from(files || []);
-    const supported = selected.filter((file) => targetFor(file.name));
-    const unsupported = selected.length - supported.length;
+    const selection = selectQQMusicFiles(files);
     setQueue((items) => {
       const known = new Set(items.map((item) => `${item.file.name}:${item.file.size}`));
-      return [...items, ...supported.filter((file) => {
+      return [...items, ...selection.files.filter((file) => {
         const key = `${file.name}:${file.size}`;
         if (known.has(key)) return false;
         known.add(key);
         return true;
       }).map(queueItemFor)];
     });
-    if (unsupported) setNotice("仅支持 .mflac 和 .mgg 文件，其他文件没有加入队列。");
-    else setNotice("");
+    setNotice(selection.notice);
   };
 
   const removeItem = (item) => {
@@ -189,11 +228,7 @@ export function QQMusicConverterPage({ onNavigate }) {
         <p>选择 QQ 音乐缓存文件，通过本地桥接服务完成格式转换；音乐文件不会离开你的电脑。</p>
       </section>
 
-      <section className={`tool-status is-${health.state}`} aria-live="polite">
-        {health.state === "checking" && <><MusicNotes size={20} aria-hidden="true" /><div><strong>正在检查桥接服务</strong><span>正在连接本机 127.0.0.1:8765…</span></div></>}
-        {health.state === "online" && <><CheckCircle size={20} aria-hidden="true" /><div><strong>桥接服务已启动{health.version ? ` · v${health.version}` : ""}</strong><span>{health.qqMusicRunning ? "QQ 音乐已运行" : "请先启动 QQ 音乐"}</span></div></>}
-        {health.state === "offline" && <><WarningCircle size={20} aria-hidden="true" /><div><strong>桥接服务未启动</strong><span>请下载并启动本地桥接服务后，再重新打开此页面。</span></div><a href={releaseUrl}>下载 QQ Music Bridge</a></>}
-      </section>
+      <BridgeStatus health={health} onRetry={retryHealth} />
 
       <div className="tool-layout">
         <section className="tool-card tool-converter-card" aria-labelledby="dropzone-title">
@@ -210,17 +245,12 @@ export function QQMusicConverterPage({ onNavigate }) {
           <div className="tool-queue-header"><h3>转换队列{queue.length ? ` · ${queue.length}` : ""}</h3>{completedCount > 0 && <button className="tool-text-button" type="button" onClick={clearCompleted}>清除已完成</button>}</div>
           {queue.length === 0 ? <p className="tool-empty">还没有文件。选择或拖放 MFLAC、MGG 缓存文件开始。</p> : <ul className="tool-queue" aria-label="转换队列">{queue.map((item) => <li className="tool-queue-item" key={item.id}>
             <div className="tool-file-meta"><MusicNotes size={20} aria-hidden="true" /><div><strong title={item.file.name}>{item.file.name}</strong><span>{formatBytes(item.file.size)} · {item.target?.slice(1).toUpperCase()}</span></div></div>
-            <div className="tool-job-meta"><span>{statusLabel(item.status, item.stage)}</span>{(item.status === "queued" || item.status === "converting") && <div className="tool-progress" aria-label={`${item.file.name} 转换进度`}><span style={{ width: `${Math.max(0, Math.min(100, item.progress))}%` }} /></div>}{item.error && <small>{item.error}</small>}</div>
+            <QueueJobStatus item={item} />
             <div className="tool-item-actions">{item.status === "completed" && item.downloadUrl && <a href={item.downloadUrl} download><DownloadSimple size={18} aria-hidden="true" /> 下载</a>}{item.status === "failed" && <button type="button" onClick={() => retryItem(item)} aria-label={`重试 ${item.file.name}`}><ArrowClockwise size={18} aria-hidden="true" /> 重试</button>}{(item.status === "ready" || item.status === "failed") && <button type="button" onClick={() => removeItem(item)} aria-label={`移除 ${item.file.name}`}><Trash size={18} aria-hidden="true" /></button>}</div>
           </li>)}</ul>}
           <button className="primary-button tool-submit" type="button" onClick={submitQueue} disabled={!readyCount || health.state !== "online"}>转换 {readyCount ? `${readyCount} 个文件` : "文件"}</button>
         </section>
-        <aside className="tool-instructions">
-          <p className="eyebrow">HOW IT WORKS</p>
-          <h2>本地处理说明</h2>
-          <ol><li>启动 QQ 音乐并保持登录。</li><li>启动 QQ Music Bridge，然后确认上方状态变为在线。</li><li>选择缓存文件，转换完成后下载结果。</li></ol>
-          <p>仅在你的电脑本地处理，页面只会请求本机桥接服务。</p>
-        </aside>
+        <ConversionInstructions online={health.state === "online"} />
       </div>
     </div>
   </main>;

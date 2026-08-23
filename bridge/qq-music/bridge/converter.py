@@ -6,10 +6,27 @@ from uuid import uuid4
 
 
 SUPPORTED_EXTENSIONS = {".mflac": ".flac", ".mgg": ".ogg"}
+DEFAULT_CONVERSION_ERROR = "转换失败，请确认文件和 QQ 音乐状态后重试"
+PUBLIC_CONVERSION_ERROR_MESSAGES = frozenset({
+    "文件名无效",
+    "仅支持 .mflac 和 .mgg 文件",
+    "无法准备转换目录",
+    "Frida 运行环境不可用，请重新下载并启动 QQ Music Bridge",
+    "找不到 hook_qq_music.js，请重新下载并启动 QQ Music Bridge",
+    "无法连接 QQ 音乐，请确认 QQ 音乐正在运行；若已运行，请退出后重新启动 QQ 音乐，再重试",
+    "当前 QQ 音乐版本暂不兼容，请更新 QQ Music Bridge 或更换 QQ 音乐版本",
+    "缓存文件转换失败，请确认文件有效后重试",
+    "无法写入转换结果，请确认本机磁盘空间后重试",
+})
 
 
 class ConversionError(RuntimeError):
     pass
+
+
+def safe_conversion_error_message(error: ConversionError) -> str:
+    message = str(error)
+    return message if message in PUBLIC_CONVERSION_ERROR_MESSAGES else DEFAULT_CONVERSION_ERROR
 
 
 def safe_source_name(source_name: str) -> str:
@@ -77,7 +94,7 @@ class FridaConverter:
         try:
             import frida
         except ImportError as error:
-            raise ConversionError("Frida 运行环境不可用") from error
+            raise ConversionError("Frida 运行环境不可用，请重新下载并启动 QQ Music Bridge") from error
         return frida
 
     def is_qq_music_running(self) -> bool:
@@ -103,7 +120,7 @@ class FridaConverter:
         if not plan.conversion_needed:
             return plan.output_path
         if not self.hook_path.is_file():
-            raise ConversionError("找不到 hook_qq_music.js")
+            raise ConversionError("找不到 hook_qq_music.js，请重新下载并启动 QQ Music Bridge")
 
         def update(value: int, stage: str) -> None:
             if progress is not None:
@@ -112,21 +129,33 @@ class FridaConverter:
         session = None
         try:
             update(10, "正在连接 QQ 音乐")
-            session = self._get_frida_api().attach("QQMusic.exe")
+            try:
+                session = self._get_frida_api().attach("QQMusic.exe")
+            except ConversionError:
+                raise
+            except Exception as error:
+                raise ConversionError("无法连接 QQ 音乐，请确认 QQ 音乐正在运行；若已运行，请退出后重新启动 QQ 音乐，再重试") from error
             update(30, "已连接 QQ 音乐，开始解密")
-            script = session.create_script(self.hook_path.read_text(encoding="utf-8"))
-            script.load()
-            script.exports_sync.decrypt(str(plan.source_path), str(plan.temporary_path))
+            try:
+                script = session.create_script(self.hook_path.read_text(encoding="utf-8"))
+                script.load()
+            except Exception as error:
+                raise ConversionError("当前 QQ 音乐版本暂不兼容，请更新 QQ Music Bridge 或更换 QQ 音乐版本") from error
+            try:
+                script.exports_sync.decrypt(str(plan.source_path), str(plan.temporary_path))
+            except Exception as error:
+                raise ConversionError("缓存文件转换失败，请确认文件有效后重试") from error
             update(70, "正在写入目标格式")
-            os.replace(plan.temporary_path, plan.output_path)
+            try:
+                os.replace(plan.temporary_path, plan.output_path)
+            except OSError as error:
+                raise ConversionError("无法写入转换结果，请确认本机磁盘空间后重试") from error
             update(100, "转换完成")
             return plan.output_path
         except ConversionError:
             raise
         except Exception as error:
-            if session is None:
-                raise ConversionError("无法连接 QQ 音乐，请确认 QQ 音乐正在运行") from error
-            raise ConversionError("转换失败，请确认文件和 QQ 音乐状态后重试") from error
+            raise ConversionError(DEFAULT_CONVERSION_ERROR) from error
         finally:
             try:
                 if plan.temporary_path.exists():

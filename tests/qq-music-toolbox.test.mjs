@@ -10,7 +10,7 @@ import { promisify } from "node:util";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createServer } from "vite";
-import { bridgeUrl, formatBytes, statusLabel, targetFor } from "../src/toolbox/qqMusic.js";
+import { bridgeUrl, formatBytes, selectQQMusicFiles, statusLabel, targetFor } from "../src/toolbox/qqMusic.js";
 import { createJobPoller } from "../src/toolbox/jobPolling.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -46,6 +46,19 @@ test("builds bridge URLs and status labels", () => {
 test("formats queue file sizes", () => {
   assert.equal(formatBytes(0), "0 B");
   assert.equal(formatBytes(1536), "1.5 KB");
+});
+
+test("keeps empty and oversized files out of the browser submit queue", () => {
+  const oneGiB = 1024 ** 3;
+  const empty = { name: "空文件.mflac", size: 0 };
+  const atLimit = { name: "刚好.mgg", size: oneGiB };
+  const oversized = { name: "过大.mflac", size: oneGiB + 1 };
+
+  const selection = selectQQMusicFiles([empty, atLimit, oversized]);
+
+  assert.deepEqual(selection.files, [atLimit]);
+  assert.match(selection.notice, /“空文件\.mflac”为空文件，请重新选择有效的缓存文件/);
+  assert.match(selection.notice, /“过大\.mflac”超过 1 GiB，请选择不大于 1 GiB 的文件/);
 });
 
 test("keeps bridge requests local while encoding non-ASCII path content", () => {
@@ -150,6 +163,49 @@ test("renders the converter dropzone and local-only conversion guidance", async 
   assert.match(html, /桥接服务/);
 });
 
+test("exposes queue progress and terminal states without a noisy queue-wide live region", async () => {
+  const { QueueJobStatus } = await loadFrontendModule("/src/toolbox/QQMusicConverterPage.jsx");
+  const activeHtml = renderToStaticMarkup(createElement(QueueJobStatus, { item: {
+    file: { name: "示例.mflac" }, status: "converting", stage: "正在解密", progress: 42, error: "",
+  } }));
+  const failedHtml = renderToStaticMarkup(createElement(QueueJobStatus, { item: {
+    file: { name: "示例.mflac" }, status: "failed", stage: "转换失败", progress: 42,
+    error: "当前 QQ 音乐版本暂不兼容，请更新 QQ Music Bridge 或更换 QQ 音乐版本",
+  } }));
+  const completedHtml = renderToStaticMarkup(createElement(QueueJobStatus, { item: {
+    file: { name: "示例.mflac" }, status: "completed", stage: "转换完成", progress: 100, error: "",
+  } }));
+
+  assert.match(activeHtml, /role="status"[^>]*aria-live="polite"/);
+  assert.match(activeHtml, /role="progressbar"/);
+  assert.match(activeHtml, /aria-valuemin="0"/);
+  assert.match(activeHtml, /aria-valuemax="100"/);
+  assert.match(activeHtml, /aria-valuenow="42"/);
+  assert.match(failedHtml, /role="alert"/);
+  assert.match(failedHtml, /当前 QQ 音乐版本暂不兼容/);
+  assert.match(completedHtml, /role="status"[^>]*aria-live="polite"/);
+
+  const { QQMusicConverterPage } = await loadFrontendModule("/src/toolbox/QQMusicConverterPage.jsx");
+  const pageHtml = renderToStaticMarkup(createElement(QQMusicConverterPage, { onNavigate: () => {} }));
+  assert.doesNotMatch(pageHtml, /<ul[^>]+aria-live=/, "the whole queue must not announce every progress tick");
+});
+
+test("offers offline recheck guidance and collapses first-use steps once online", async () => {
+  const { BridgeStatus, ConversionInstructions } = await loadFrontendModule("/src/toolbox/QQMusicConverterPage.jsx");
+  const offlineHtml = renderToStaticMarkup(createElement(BridgeStatus, {
+    health: { state: "offline", qqMusicRunning: false, version: "" }, onRetry: () => {},
+  }));
+  const onlineInstructions = renderToStaticMarkup(createElement(ConversionInstructions, { online: true }));
+  const offlineInstructions = renderToStaticMarkup(createElement(ConversionInstructions, { online: false }));
+
+  assert.match(offlineHtml, /重新检测/);
+  assert.match(offlineHtml, /自动重检/);
+  assert.doesNotMatch(offlineHtml, /重新打开此页面/);
+  assert.doesNotMatch(onlineInstructions, /<ol>/);
+  assert.match(onlineInstructions, /本地处理/);
+  assert.match(offlineInstructions, /<ol>/);
+});
+
 test("generates toolbox sitemap routes for the production origin without changing public assets", async () => {
   const outputDir = await fsPromises.mkdtemp(path.join(os.tmpdir(), "qq-music-sitemap-"));
   const publicSitemapPath = path.join(root, "public", "sitemap.xml");
@@ -226,10 +282,19 @@ test("defines a least-privilege, immutable Windows release workflow", () => {
   assert.equal(download?.uses, "actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53");
   assert.equal(download?.with?.name, "qq-music-bridge");
   assert.equal(download?.with?.path, "dist");
-  const releaseCommand = release.steps.find((step) => step.run?.includes("gh release create"));
+  const releaseCommand = release.steps.find((step) => step.env?.GH_TOKEN);
   assert.equal(releaseCommand?.env?.GH_TOKEN, "${{ secrets.GITHUB_TOKEN }}");
-  assert.match(releaseCommand?.run || "", /gh release create/);
-  assert.match(releaseCommand?.run || "", /gh release upload/);
-  assert.match(releaseCommand?.run || "", /Test-Path -LiteralPath/);
+  const releaseScript = releaseCommand?.run || "";
+  const viewPositions = [...releaseScript.matchAll(/gh release view/g)].map((match) => match.index);
+  const createPosition = releaseScript.indexOf("gh release create");
+  const uploadPosition = releaseScript.indexOf("gh release upload");
+  assert.ok(viewPositions.length >= 2, "release existence and create-race recovery must both be checked");
+  assert.ok(viewPositions[0] < createPosition, "an existing release must be viewed before create is attempted");
+  assert.ok(createPosition < viewPositions[1], "a failed create must re-check whether another runner created the release");
+  assert.ok(viewPositions[1] < uploadPosition, "asset upload must happen after release existence is established");
+  assert.match(releaseScript, /gh release upload[^\r\n]+--clobber/);
+  assert.match(releaseScript, /gh release create[^\r\n]+[\s\S]+\$createExitCode = \$LASTEXITCODE[\s\S]+throw "Release create failed/);
+  assert.match(releaseScript, /gh release upload[^\r\n]+[\s\S]+if \(\$LASTEXITCODE -ne 0\)[\s\S]+throw "Release upload failed/);
+  assert.match(releaseScript, /Test-Path -LiteralPath/);
   assert.ok(![...build.steps, ...release.steps].some((step) => step.uses?.startsWith("softprops/action-gh-release@")));
 });

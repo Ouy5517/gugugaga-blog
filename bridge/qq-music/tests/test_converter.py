@@ -34,10 +34,13 @@ class FakeExports:
 class FakeScript:
     def __init__(self, source, frida):
         self.source = source
+        self.frida = frida
         self.loaded = False
         self.exports_sync = FakeExports(frida)
 
     def load(self):
+        if self.frida.script_load_error:
+            raise self.frida.script_load_error
         self.loaded = True
 
 
@@ -59,6 +62,7 @@ class FakeFrida:
     def __init__(self):
         self.attached_process = None
         self.attach_error = None
+        self.script_load_error = None
         self.decrypt_error = None
         self.process_names = []
         self.session = FakeSession(self)
@@ -144,8 +148,16 @@ class FridaConverterTests(unittest.TestCase):
     def test_converter_reports_missing_qq_music(self):
         self.fake_frida.attach_error = RuntimeError("process not found")
 
-        with self.assertRaisesRegex(ConversionError, "QQ 音乐正在运行"):
+        with self.assertRaisesRegex(ConversionError, "QQ 音乐正在运行.*重新启动 QQ 音乐"):
             self.converter.convert(self.source, self.source.name, self.output)
+
+    def test_converter_reports_incompatible_hook_or_symbols(self):
+        self.fake_frida.script_load_error = RuntimeError(f"missing export beside {self.root}")
+
+        with self.assertRaisesRegex(ConversionError, "当前 QQ 音乐版本暂不兼容") as context:
+            self.converter.convert(self.source, self.source.name, self.output)
+
+        self.assertNotIn(str(self.root), str(context.exception))
 
     def test_converter_reports_missing_hook(self):
         converter = FridaConverter(self.root / "missing.js", self.runtime, self.fake_frida)

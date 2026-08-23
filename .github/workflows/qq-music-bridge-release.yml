@@ -46,9 +46,25 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          $ErrorActionPreference = "Stop"
           $asset = "dist/qq-music-bridge.exe"
+          $tag = "$env:GITHUB_REF_NAME"
           if (-not (Test-Path -LiteralPath $asset -PathType Leaf)) {
             throw "Release artifact is missing: $asset"
           }
-          gh release create "$env:GITHUB_REF_NAME" --title "$env:GITHUB_REF_NAME" --generate-notes
-          gh release upload "$env:GITHUB_REF_NAME" $asset --clobber
+          gh release view "$tag" --json tagName *> $null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create "$tag" --title "$tag" --generate-notes
+            $createExitCode = $LASTEXITCODE
+            if ($createExitCode -ne 0) {
+              # Another runner may have created the release after the first view.
+              gh release view "$tag" --json tagName *> $null
+              if ($LASTEXITCODE -ne 0) {
+                throw "Release create failed with exit code $createExitCode"
+              }
+            }
+          }
+          gh release upload "$tag" $asset --clobber
+          if ($LASTEXITCODE -ne 0) {
+            throw "Release upload failed with exit code $LASTEXITCODE"
+          }

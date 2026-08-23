@@ -12,11 +12,13 @@ from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
+from bridge.converter import ConversionError
 from bridge.server import MAX_UPLOAD_BYTES, create_server
 
 
 BLOG_ORIGIN = "https://gugugaga-blog.netlify.app"
 LOCAL_DEV_ORIGIN = "http://127.0.0.1:5173"
+LOCALHOST_DEV_ORIGIN = "http://localhost:5173"
 
 
 class BridgeServerTests(unittest.TestCase):
@@ -131,25 +133,35 @@ class BridgeServerTests(unittest.TestCase):
         self.assertNotIn("Access-Control-Allow-Origin", denied.headers)
         self.assertNotIn("Access-Control-Allow-Private-Network", denied.headers)
 
-    def test_preflight_allows_local_vite_origin(self):
-        response = self.request("OPTIONS", "/api/convert", headers={
-            "Origin": LOCAL_DEV_ORIGIN,
+    def test_preflight_allows_exact_local_vite_origins_only(self):
+        for origin in (LOCAL_DEV_ORIGIN, LOCALHOST_DEV_ORIGIN):
+            with self.subTest(origin=origin):
+                response = self.request("OPTIONS", "/api/convert", headers={
+                    "Origin": origin,
+                    "Access-Control-Request-Method": "POST",
+                    "Access-Control-Request-Headers": "content-type,x-file-name",
+                    "Access-Control-Request-Private-Network": "true",
+                })
+
+                self.assertEqual(response.status, 204)
+                self.assertEqual(response.headers["Access-Control-Allow-Origin"], origin)
+                self.assertEqual(response.headers["Access-Control-Allow-Private-Network"], "true")
+
+        denied = self.request("OPTIONS", "/api/convert", headers={
+            "Origin": f"{LOCALHOST_DEV_ORIGIN}.evil",
             "Access-Control-Request-Method": "POST",
-            "Access-Control-Request-Headers": "content-type,x-file-name",
-            "Access-Control-Request-Private-Network": "true",
         })
+        self.assertEqual(denied.status, 403)
+        self.assertNotIn("Access-Control-Allow-Origin", denied.headers)
 
-        self.assertEqual(response.status, 204)
-        self.assertEqual(response.headers["Access-Control-Allow-Origin"], LOCAL_DEV_ORIGIN)
-        self.assertEqual(response.headers["Access-Control-Allow-Private-Network"], "true")
+    def test_health_cors_allows_exact_local_vite_origins_only(self):
+        for origin in (LOCAL_DEV_ORIGIN, LOCALHOST_DEV_ORIGIN):
+            with self.subTest(origin=origin):
+                allowed = self.request("GET", "/api/health", headers={"Origin": origin})
+                self.assertEqual(allowed.status, 200)
+                self.assertEqual(allowed.headers["Access-Control-Allow-Origin"], origin)
 
-    def test_health_cors_allows_exact_local_vite_origin_only(self):
-        allowed = self.request("GET", "/api/health", headers={"Origin": LOCAL_DEV_ORIGIN})
-
-        self.assertEqual(allowed.status, 200)
-        self.assertEqual(allowed.headers["Access-Control-Allow-Origin"], LOCAL_DEV_ORIGIN)
-
-        for origin in ("http://127.0.0.1:5173.evil", "https://attacker.example"):
+        for origin in ("http://127.0.0.1:5173.evil", "http://localhost:5173.evil", "https://attacker.example"):
             with self.subTest(origin=origin):
                 denied = self.request("GET", "/api/health", headers={"Origin": origin})
                 self.assertEqual(denied.status, 200)
@@ -194,6 +206,26 @@ class BridgeServerTests(unittest.TestCase):
         self.assertEqual(unfinished.status, 409)
         self.assertNotIn(str(self.root), unfinished.body.decode("utf-8"))
         release.set()
+
+    def test_job_api_returns_safe_actionable_conversion_error(self):
+        self.server.shutdown()
+        self.server.server_close()
+        self.thread.join(timeout=2)
+        actionable = "当前 QQ 音乐版本暂不兼容，请更新 QQ Music Bridge 或更换 QQ 音乐版本"
+
+        def incompatible_converter(*_args):
+            raise ConversionError(actionable)
+
+        self.server = create_server("127.0.0.1", 0, self.root, converter=incompatible_converter)
+        self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
+        self.thread.start()
+
+        job_id = json.loads(self.upload().body)["jobId"]
+        payload = self.wait_for_job(job_id)
+
+        self.assertEqual(payload["status"], "failed")
+        self.assertEqual(payload["error"], actionable)
+        self.assertNotIn(str(self.root), json.dumps(payload, ensure_ascii=False))
 
     def test_download_refuses_a_completed_job_with_an_external_output_path(self):
         job_id = json.loads(self.upload().body)["jobId"]

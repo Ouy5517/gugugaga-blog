@@ -10,6 +10,7 @@ from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
+from bridge.converter import ConversionError
 from bridge.jobs import JobManager
 
 
@@ -100,6 +101,34 @@ class JobManagerTests(unittest.TestCase):
         self.assertTrue(wait_until(lambda: job.status == "failed"))
         self.assertNotIn("downloadUrl", job.to_dict())
         self.assertNotIn(str(self.root), job.to_dict()["error"])
+
+    def test_worker_preserves_only_safe_actionable_conversion_errors(self):
+        unsafe_source = self.root / "unsafe.mflac"
+        unsafe_source.write_bytes(b"encrypted")
+        for index, actionable in enumerate((
+            "Frida 运行环境不可用，请重新下载并启动 QQ Music Bridge",
+            "无法连接 QQ 音乐，请确认 QQ 音乐正在运行；若已运行，请退出后重新启动 QQ 音乐，再重试",
+            "当前 QQ 音乐版本暂不兼容，请更新 QQ Music Bridge 或更换 QQ 音乐版本",
+        )):
+            with self.subTest(actionable=actionable):
+                safe_source = self.root / f"safe-{index}.mflac"
+                safe_source.write_bytes(b"encrypted")
+
+                def safe_failure(*_args, message=actionable):
+                    raise ConversionError(message)
+
+                safe_manager = self.make_manager(safe_failure)
+                safe_job = safe_manager.submit(safe_source.name, safe_source)
+                self.assertTrue(wait_until(lambda: safe_job.status == "failed"))
+                self.assertEqual(safe_job.to_dict()["error"], actionable)
+
+        def unsafe_failure(*_args):
+            raise ConversionError(f"failed beside {self.root}")
+
+        unsafe_manager = self.make_manager(unsafe_failure)
+        unsafe_job = unsafe_manager.submit(unsafe_source.name, unsafe_source)
+        self.assertTrue(wait_until(lambda: unsafe_job.status == "failed"))
+        self.assertNotIn(str(self.root), unsafe_job.to_dict()["error"])
 
     def test_worker_removes_its_empty_incoming_job_directory(self):
         job_dir = self.incoming_dir / "job-under-test"
