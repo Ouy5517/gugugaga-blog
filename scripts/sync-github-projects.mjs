@@ -3,7 +3,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const projectsDir = path.join(root, "src", "content", "projects");
+const defaultProjectsDir = path.join(root, "src", "content", "projects");
+const recentWindow = 1000 * 60 * 60 * 24 * 180;
 
 async function loadDotEnv() {
   try {
@@ -15,7 +16,7 @@ async function loadDotEnv() {
   } catch {}
 }
 
-function frontMatter(raw) {
+function parseFrontMatter(raw) {
   const match = raw.match(/^---\s*\r?\n([\s\S]*?)\r?\n---\s*\r?\n?/);
   if (!match) return null;
   const fields = {};
@@ -23,7 +24,7 @@ function frontMatter(raw) {
     const field = line.match(/^([\w-]+):\s*(.*)$/);
     if (field) fields[field[1]] = field[2].trim();
   });
-  return { header: match[1], fields, start: match[0].length - match[1].length - 5, end: match[0].length - 4 };
+  return { header: match[1], suffix: raw.slice(match[0].length), fields };
 }
 
 function replaceScalar(header, key, value) {
@@ -32,50 +33,64 @@ function replaceScalar(header, key, value) {
   return `${header.trimEnd()}\n${key}: ${value}`;
 }
 
-function repoName(fields) {
-  if (fields.name) return fields.name.replace(/^['"]|['"]$/g, "");
-  const match = fields.url?.match(/github\.com\/[^/]+\/([^/#]+)\/?$/i);
-  return match?.[1] || "";
+export function extractRepository(fields, fallbackOwner = "") {
+  const match = fields.url?.match(/^https?:\/\/github\.com\/([^/]+)\/([^/#?]+)\/?(?:[?#].*)?$/i);
+  if (match) return { owner: match[1], repository: match[2] };
+  const repository = fields.name?.replace(/^['"]|['"]$/g, "").trim();
+  return fallbackOwner && repository ? { owner: fallbackOwner, repository } : null;
 }
 
-await loadDotEnv();
-const username = process.env.GITHUB_USERNAME || "Ouy5517";
-const token = process.env.GITHUB_TOKEN;
-const files = (await fs.readdir(projectsDir)).filter((file) => file.endsWith(".md"));
-const headers = { Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28", "User-Agent": "gugu-blog-content-sync" };
-if (token) headers.Authorization = `Bearer ${token}`;
-let synced = 0;
-
-for (const file of files) {
-  const filePath = path.join(projectsDir, file);
-  const raw = await fs.readFile(filePath, "utf8");
-  const parsed = frontMatter(raw);
-  if (!parsed || parsed.fields.githubSync !== "true") continue;
-
-  const name = repoName(parsed.fields);
-  if (!name) {
-    console.warn(`Skipped ${file}: missing name or GitHub URL.`);
-    continue;
-  }
-  const response = await fetch(`https://api.github.com/repos/${username}/${name}`, { headers });
-  if (!response.ok) {
-    const detail = await response.text();
-    const hint = response.status === 403 ? "；可能触发了 GitHub API 限流，请配置 GITHUB_TOKEN 后重试" : "";
-    throw new Error(`GitHub API ${response.status} while reading ${username}/${name}${hint}\n${detail.slice(0, 240)}`);
-  }
-  const repo = await response.json();
-  const status = repo.archived ? "已归档" : (Date.now() - new Date(repo.pushed_at).getTime() < 1000 * 60 * 60 * 24 * 180 ? "进行中" : "维护中");
-  let nextHeader = parsed.header;
-  nextHeader = replaceScalar(nextHeader, "description", JSON.stringify(repo.description || parsed.fields.description || ""));
-  nextHeader = replaceScalar(nextHeader, "url", repo.html_url);
-  nextHeader = replaceScalar(nextHeader, "status", status);
-  nextHeader = replaceScalar(nextHeader, "githubStars", String(repo.stargazers_count));
-  nextHeader = replaceScalar(nextHeader, "githubForks", String(repo.forks_count));
-  nextHeader = replaceScalar(nextHeader, "githubUpdated", repo.pushed_at.slice(0, 10));
-  const nextRaw = `---\n${nextHeader.trim()}\n---${raw.slice(raw.indexOf("---", 4) + 3)}`;
-  await fs.writeFile(filePath, nextRaw, "utf8");
-  synced += 1;
-  console.log(`Synced ${file} ← ${repo.full_name}`);
+export function metadataForRepository(repo, now = Date.now()) {
+  const pushedAt = repo.pushed_at ? new Date(repo.pushed_at).getTime() : 0;
+  const status = repo.archived ? "已归档" : (Number(now) - pushedAt < recentWindow ? "进行中" : "维护中");
+  return { description: repo.description || "", url: repo.html_url, status, githubStars: repo.stargazers_count, githubForks: repo.forks_count, githubUpdated: repo.pushed_at?.slice(0, 10) || "" };
 }
 
-if (!synced) console.log("No project has githubSync: true; add it to a project's Front Matter to opt in.");
+export function updateProjectDocument(raw, repo, now = Date.now()) {
+  const parsed = parseFrontMatter(raw);
+  if (!parsed) return raw;
+  const metadata = metadataForRepository(repo, now);
+  const localDescription = parsed.fields.description?.replace(/^(['"])(.*)\1$/, "$2") || "";
+  let header = parsed.header;
+  header = replaceScalar(header, "description", JSON.stringify(metadata.description || localDescription));
+  header = replaceScalar(header, "url", metadata.url);
+  header = replaceScalar(header, "status", metadata.status);
+  header = replaceScalar(header, "githubStars", String(metadata.githubStars));
+  header = replaceScalar(header, "githubForks", String(metadata.githubForks));
+  header = replaceScalar(header, "githubUpdated", metadata.githubUpdated);
+  return `---\n${header.trim()}\n---\n${parsed.suffix}`;
+}
+
+export async function syncProjects({ projectsDir = defaultProjectsDir, fetchImpl = fetch, env = process.env, logger = console, now = Date.now() } = {}) {
+  const files = (await fs.readdir(projectsDir)).filter((file) => file.endsWith(".md"));
+  const username = env.GITHUB_USERNAME || "Ouy5517";
+  const token = env.GITHUB_TOKEN;
+  const headers = { Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28", "User-Agent": "gugu-blog-content-sync" };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const entries = [];
+  for (const file of files) {
+    const filePath = path.join(projectsDir, file);
+    const raw = await fs.readFile(filePath, "utf8");
+    const parsed = parseFrontMatter(raw);
+    if (!parsed || parsed.fields.githubSync !== "true") continue;
+    const repoRef = extractRepository(parsed.fields, username);
+    if (!repoRef) { logger.warn?.(`Skipped ${file}: missing name or GitHub URL.`); continue; }
+    const response = await fetchImpl(`https://api.github.com/repos/${repoRef.owner}/${repoRef.repository}`, { headers });
+    if (!response.ok) {
+      const detail = await response.text();
+      const hint = response.status === 403 ? "；可能触发了 GitHub API 限流，请配置 GITHUB_TOKEN 后重试" : "";
+      throw new Error(`GitHub API ${response.status} while reading ${repoRef.owner}/${repoRef.repository}${hint}\n${detail.slice(0, 240)}`);
+    }
+    entries.push({ file, filePath, raw, repo: await response.json() });
+  }
+  let changed = 0;
+  for (const entry of entries) {
+    const nextRaw = updateProjectDocument(entry.raw, entry.repo, now);
+    if (nextRaw !== entry.raw) { await fs.writeFile(entry.filePath, nextRaw, "utf8"); changed += 1; }
+    logger.log?.(`Synced ${entry.file} ← ${entry.repo.full_name || entry.repo.html_url}`);
+  }
+  if (!entries.length) logger.log?.("No project has githubSync: true; add it to a project's Front Matter to opt in.");
+  return { scanned: files.length, synced: entries.length, changed };
+}
+
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) { await loadDotEnv(); await syncProjects(); }
