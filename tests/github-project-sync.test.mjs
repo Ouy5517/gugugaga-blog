@@ -205,7 +205,22 @@ test("updateProjectDocument preserves editorial fields and the Markdown body", (
 
 test("updateProjectDocument preserves the local description when GitHub description is empty", () => {
   const next = updateProjectDocument(optedInProject("demo"), githubRepository("demo", { description: "" }));
-  assert.match(next, /description: "本地描述"/);
+  assert.match(next, /description: 本地描述/);
+});
+
+test("updateProjectDocument preserves an already JSON-escaped local description", () => {
+  const raw = String.raw`---
+name: demo
+description: "Quote: \"hello\""
+githubSync: true
+---
+
+正文
+`;
+  const next = updateProjectDocument(raw, githubRepository("demo", { description: "" }));
+  const descriptionLine = next.split("\n").find((line) => line.startsWith("description:"));
+  assert.equal(descriptionLine, String.raw`description: "Quote: \"hello\""`);
+  assert.equal(parseValue(descriptionLine.slice("description:".length).trim()), 'Quote: "hello"');
 });
 
 test("syncProjects writes nothing when one opted-in repository API request fails", async () => {

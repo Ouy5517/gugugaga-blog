@@ -51,9 +51,8 @@ export function updateProjectDocument(raw, repo, now = Date.now()) {
   const parsed = parseFrontMatter(raw);
   if (!parsed) return raw;
   const metadata = metadataForRepository(repo, now);
-  const localDescription = parsed.fields.description?.replace(/^(['"])(.*)\1$/, "$2") || "";
   let header = parsed.header;
-  header = replaceScalar(header, "description", JSON.stringify(metadata.description || localDescription));
+  if (metadata.description) header = replaceScalar(header, "description", JSON.stringify(metadata.description));
   header = replaceScalar(header, "url", metadata.url);
   header = replaceScalar(header, "status", metadata.status);
   header = replaceScalar(header, "githubStars", String(metadata.githubStars));
