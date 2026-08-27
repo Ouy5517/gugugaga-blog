@@ -37,11 +37,15 @@ test("defines a six-hour workflow with guarded commits", async () => {
   assert.match(commitStep.run, /git add src\/content\/projects/);
   assert.match(commitStep.run, /github-actions\[bot\]/);
   assert.equal(commitStep.shell, "bash");
-  const stagingCommands = commitStep.run
+  const executableLines = commitStep.run
     .split("\n")
     .map((line) => line.trim())
-    .filter((line) => line.startsWith("git add "));
+    .filter((line) => line && !line.startsWith("#"));
+  const stagingCommands = executableLines.filter((line) => /^(?:git(?:\s+-C\s+\S+)?\s+add)\s+/.test(line));
   assert.deepEqual(stagingCommands, ["git add src/content/projects"]);
+  const executableScript = executableLines.join("\n");
+  assert.doesNotMatch(executableScript, /\bgit add (?:\.|-A|--all)(?:\s|$)/m);
+  assert.doesNotMatch(executableScript, /\bgit -C\s+\S+\s+add\b/m);
   for (const step of job.steps) {
     assert.equal(step["continue-on-error"], undefined);
     assert.doesNotMatch(step.run ?? "", /\|\|\s*true/);
