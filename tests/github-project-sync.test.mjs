@@ -37,7 +37,10 @@ stack:
 url: https://github.com/Ouy5517/${name}
 status: 维护中
 featured: true
+image: /images/demo.png
+draft: false
 githubSync: true
+customField: 手工扩展字段
 ---
 
 正文不能被覆盖。
@@ -102,6 +105,11 @@ test("updateProjectDocument preserves editorial fields and the Markdown body", (
   assert.match(next, /detail: 手工项目说明/);
   assert.match(next, /- React/);
   assert.match(next, /正文不能被覆盖。/);
+  assert.match(next, /featured: true/);
+  assert.match(next, /image: \/images\/demo\.png/);
+  assert.match(next, /draft: false/);
+  assert.match(next, /githubSync: true/);
+  assert.match(next, /customField: 手工扩展字段/);
   assert.match(next, /githubStars: 3/);
   assert.match(next, /githubForks: 2/);
 });
