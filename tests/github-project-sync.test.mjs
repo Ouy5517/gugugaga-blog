@@ -21,6 +21,13 @@ test("extractRepository prefers the owner and repository in a GitHub URL", () =>
   );
 });
 
+test("extractRepository handles a YAML-quoted GitHub URL", () => {
+  assert.deepEqual(
+    extractRepository({ url: '"https://github.com/acme/demo"' }, "Ouy5517"),
+    { owner: "acme", repository: "demo" },
+  );
+});
+
 test("metadataForRepository maps an active repository", () => {
   const metadata = metadataForRepository({
     archived: false,

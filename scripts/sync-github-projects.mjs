@@ -34,7 +34,8 @@ function replaceScalar(header, key, value) {
 }
 
 export function extractRepository(fields, fallbackOwner = "") {
-  const match = fields.url?.match(/^https?:\/\/github\.com\/([^/]+)\/([^/#?]+)\/?(?:[?#].*)?$/i);
+  const url = fields.url?.replace(/^(['"])(.*)\1$/, "$2");
+  const match = url?.match(/^https?:\/\/github\.com\/([^/]+)\/([^/#?]+)\/?(?:[?#].*)?$/i);
   if (match) return { owner: match[1], repository: match[2] };
   const repository = fields.name?.replace(/^['"]|['"]$/g, "").trim();
   return fallbackOwner && repository ? { owner: fallbackOwner, repository } : null;
