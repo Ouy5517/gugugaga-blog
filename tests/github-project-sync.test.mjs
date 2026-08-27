@@ -164,6 +164,14 @@ test("parseValue decodes JSON-escaped Markdown description text", () => {
   assert.equal(parseValue('"Quote: \\\"hello\\\"; path C:\\\\tmp; line\\nnext"'), "Quote: \"hello\"; path C:\\tmp; line\nnext");
 });
 
+test("parseValue preserves existing Front Matter scalar and array types", () => {
+  assert.equal(parseValue("'legacy text'"), "legacy text");
+  assert.deepEqual(parseValue("['one', 'two']"), ["one", "two"]);
+  assert.equal(parseValue("true"), true);
+  assert.equal(parseValue("false"), false);
+  assert.equal(parseValue("42"), 42);
+});
+
 test("updateProjectDocument preserves the Front Matter separator blank line and body", () => {
   const raw = "---\nname: demo\ndescription: local\ngithubSync: true\n---\n\n正文第一行\n\n正文末行\n";
   const repo = {
