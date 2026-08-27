@@ -233,7 +233,8 @@ githubSync: true
 同步任务由 GitHub Actions 每 6 小时自动运行，也可以在 Actions 页面选择
 `sync-github-projects` 工作流，通过 `workflow_dispatch` 手动同步。工作流会从项目的
 `url`（例如 `https://github.com/Ouy5517/demo`）解析 GitHub 的 owner 和 name，因此
-URL 中的仓库归属优先于文件名；不是 GitHub 仓库或未加入 opt-in 字段的项目会被跳过。
+URL 中的仓库归属优先于文件名。未加入 `githubSync: true` 的项目会被跳过；缺少可解析的
+GitHub URL 时，使用 `GITHUB_USERNAME` 与项目 `name` 回退；缺少 `name` 时跳过项目。
 
 Actions 自动维护这些项目元数据：
 

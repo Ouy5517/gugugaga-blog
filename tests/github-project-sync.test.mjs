@@ -10,6 +10,7 @@ import {
   syncProjects,
   updateProjectDocument,
 } from "../scripts/sync-github-projects.mjs";
+import { parseValue } from "../src/content/parse-value.js";
 
 const root = path.resolve(import.meta.dirname, "..");
 const workflowPath = path.join(root, ".github", "workflows", "sync-github-projects.yml");
@@ -24,6 +25,9 @@ test("documents automatic GitHub project synchronization", async () => {
   assert.match(readme, /未归档.*180 天.*进行中/);
   assert.match(readme, /否则.*维护中/);
   assert.match(readme, /owner.*name|owner.*仓库/si);
+  assert.match(readme, /缺少可解析.*GitHub URL.*GITHUB_USERNAME.*name.*回退/s);
+  assert.match(readme, /缺少 name.*跳过/s);
+  assert.match(readme, /未加入.*githubSync.*跳过/s);
   assert.match(readme, /githubStars.*githubForks.*githubUpdated/s);
   assert.match(readme, /空描述.*保留.*描述/);
   assert.match(readme, /API.*失败.*零写入/s);
@@ -154,6 +158,10 @@ test("metadataForRepository maps an active repository", () => {
     githubForks: 4,
     githubUpdated: "2026-08-20",
   });
+});
+
+test("parseValue decodes JSON-escaped Markdown description text", () => {
+  assert.equal(parseValue('"Quote: \\\"hello\\\"; path C:\\\\tmp; line\\nnext"'), "Quote: \"hello\"; path C:\\tmp; line\nnext");
 });
 
 test("updateProjectDocument preserves the Front Matter separator blank line and body", () => {

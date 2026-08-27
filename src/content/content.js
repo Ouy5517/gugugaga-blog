@@ -1,12 +1,4 @@
-function parseValue(value) {
-  const normalized = value.trim();
-  if (normalized === "true") return true;
-  if (normalized === "false") return false;
-  if (/^\d+$/.test(normalized)) return Number(normalized);
-  if ((normalized.startsWith("\"") && normalized.endsWith("\"")) || (normalized.startsWith("'") && normalized.endsWith("'"))) return normalized.slice(1, -1);
-  if (normalized.startsWith("[") && normalized.endsWith("]")) return normalized.slice(1, -1).split(",").map((item) => item.trim()).filter(Boolean).map(parseValue);
-  return normalized;
-}
+import { parseValue } from "./parse-value.js";
 
 function parseMarkdown(raw) {
   const match = raw.match(/^---\s*\r?\n([\s\S]*?)\r?\n---\s*\r?\n?([\s\S]*)$/);
