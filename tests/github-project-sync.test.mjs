@@ -320,7 +320,7 @@ test("syncProjects fails visibly when successful cleanup cannot remove a backup"
   const failingFs = {
     ...fs,
     unlink: async (target) => {
-      if (target.includes(".sync-backup-")) throw new Error("injected cleanup failure");
+      if (target.includes("one.md.sync-backup-")) throw new Error("injected cleanup failure");
       return fs.unlink(target);
     },
   };
@@ -329,6 +329,9 @@ test("syncProjects fails visibly when successful cleanup cannot remove a backup"
     fsImpl: failingFs,
     fetchImpl: async (url) => Response.json(githubRepository(url.endsWith("/one") ? "one" : "two")),
     env: { GITHUB_USERNAME: "Ouy5517" },
-  }), (error) => error.message.includes(".sync-backup-") && error.message.includes("injected cleanup failure"));
-  assert.ok((await readSyncArtifacts(before.directory)).some((file) => file.includes(".sync-backup-")));
+  }), (error) => error.message.includes("one.md.sync-backup-") && error.message.includes("injected cleanup failure"));
+  const artifacts = await readSyncArtifacts(before.directory);
+  assert.equal(artifacts.filter((file) => file.includes("one.md.sync-backup-")).length, 1);
+  assert.equal(artifacts.filter((file) => file.includes("two.md.sync-backup-")).length, 0);
+  assert.match((await fs.readFile(path.join(before.directory, artifacts.find((file) => file.includes("one.md.sync-backup-"))), "utf8")), /正文不能被覆盖。/);
 });
