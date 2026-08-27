@@ -327,6 +327,7 @@ test("syncProjects fails visibly when successful cleanup cannot remove a backup"
   await assert.rejects(() => syncProjects({
     projectsDir: before.directory,
     fsImpl: failingFs,
+    logger: { error: () => {} },
     fetchImpl: async (url) => Response.json(githubRepository(url.endsWith("/one") ? "one" : "two")),
     env: { GITHUB_USERNAME: "Ouy5517" },
   }), (error) => error.message.includes("one.md.sync-backup-") && error.message.includes("injected cleanup failure"));
