@@ -26,7 +26,7 @@ test("documents automatic GitHub project synchronization", async () => {
   assert.match(readme, /否则.*维护中/);
   assert.match(readme, /owner.*name|owner.*仓库/si);
   assert.match(readme, /缺少可解析.*GitHub URL.*GITHUB_USERNAME.*name.*回退/s);
-  assert.match(readme, /缺少\s+`?name`?.*跳过/s);
+  assert.match(readme, /缺少可解析的\s+GitHub URL\s+且缺少\s+`?name`?.*跳过/s);
   assert.match(readme, /未加入.*githubSync.*跳过/s);
   assert.match(readme, /githubStars.*githubForks.*githubUpdated/s);
   assert.match(readme, /空描述.*保留.*描述/);
