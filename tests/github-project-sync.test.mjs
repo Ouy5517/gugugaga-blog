@@ -17,14 +17,28 @@ const workflowPath = path.join(root, ".github", "workflows", "sync-github-projec
 test("defines a six-hour workflow with guarded commits", async () => {
   const workflow = YAML.parse(await fs.readFile(workflowPath, "utf8"));
   const job = workflow.jobs?.sync;
+  assert.deepEqual(Object.keys(workflow.jobs ?? {}), ["sync"]);
   assert.deepEqual(workflow.on?.schedule, [{ cron: "17 */6 * * *" }]);
   assert.equal(workflow.on?.workflow_dispatch, null);
   assert.deepEqual(job?.permissions, { contents: "write" });
-  assert.equal(job?.steps?.find((step) => step.uses?.startsWith("actions/checkout@"))?.uses, "actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09");
-  assert.equal(job?.steps?.find((step) => step.uses?.startsWith("actions/setup-node@"))?.uses, "actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020");
+  const checkoutStep = job?.steps?.find((step) => step.uses?.startsWith("actions/checkout@"));
+  assert.equal(checkoutStep?.uses, "actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09");
+  assert.equal(checkoutStep?.with?.ref, "main");
+  const setupNodeStep = job?.steps?.find((step) => step.uses?.startsWith("actions/setup-node@"));
+  assert.equal(setupNodeStep?.uses, "actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020");
+  assert.equal(setupNodeStep?.with?.["node-version"], "20");
+  const syncStep = job?.steps?.find((step) => step.run === "npm run sync:github");
+  assert.ok(syncStep);
+  assert.equal(syncStep.env?.GITHUB_TOKEN, "${{ secrets.GITHUB_TOKEN }}");
   const commitStep = job.steps.find((step) => step.run?.includes("git diff --quiet -- src/content/projects"));
   assert.match(commitStep.run, /git commit -m/);
   assert.match(commitStep.run, /git push origin HEAD:main/);
+  assert.match(commitStep.run, /git add src\/content\/projects/);
+  assert.match(commitStep.run, /github-actions\[bot\]/);
+  for (const step of job.steps) {
+    assert.equal(step["continue-on-error"], undefined);
+    assert.doesNotMatch(step.run ?? "", /\|\|\s*true/);
+  }
 });
 
 function githubRepository(name, overrides = {}) {
