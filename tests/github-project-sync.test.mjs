@@ -14,6 +14,14 @@ import {
 const root = path.resolve(import.meta.dirname, "..");
 const workflowPath = path.join(root, ".github", "workflows", "sync-github-projects.yml");
 
+test("documents automatic GitHub project synchronization", async () => {
+  const readme = await fs.readFile(path.join(root, "README.md"), "utf8");
+  assert.match(readme, /每 6 小时|6 小时/);
+  assert.match(readme, /workflow_dispatch|手动.*同步/);
+  assert.match(readme, /githubSync: true/);
+  assert.match(readme, /只在.*变化.*提交|有变化.*提交/);
+});
+
 test("defines a six-hour workflow with guarded commits", async () => {
   const workflow = YAML.parse(await fs.readFile(workflowPath, "utf8"));
   const job = workflow.jobs?.sync;

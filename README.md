@@ -224,28 +224,41 @@ SITE_URL=https://你的正式域名
 
 ### 4.8 GitHub 项目同步
 
-项目文件中加入下面的字段后，脚本才会同步该仓库：
+只有项目 Front Matter 明确加入 `githubSync: true` 时，自动维护才会启用：
 
 ~~~yaml
 githubSync: true
 ~~~
 
-执行：
+同步任务由 GitHub Actions 每 6 小时自动运行，也可以在 Actions 页面选择
+`sync-github-projects` 工作流，通过 `workflow_dispatch` 手动同步。工作流会从项目的
+`url`（例如 `https://github.com/Ouy5517/demo`）解析 GitHub 的 owner 和 name，因此
+URL 中的仓库归属优先于文件名；不是 GitHub 仓库或未加入 opt-in 字段的项目会被跳过。
+
+Actions 自动维护这些项目元数据：
+
+- `url`：仓库地址。
+- `description`：仓库描述；GitHub 返回空描述时保留本地已有描述。
+- `status`：根据仓库是否归档更新项目状态。
+- `githubStars`、`githubForks`：Star 和 Fork 数。
+- `githubUpdated`：最近推送日期。
+
+`title`、`detail`、`stack`、`featured`、`image`、`draft`、正文以及其他手工字段始终由
+博客维护，不会被同步覆盖。API 请求只要有失败，脚本就零写入并让工作流失败，以免产生
+不完整的项目文件。同步完成后只在项目元数据有变化时提交；无变化运行不会
+创建 commit。Bot commit 推送到 `main` 后，Netlify 会按既有配置自动部署。
+
+本地可以用下面的命令预览或排查同步结果：
 
 ~~~powershell
+cd blog-site
 npm run sync:github
+npm run build
 ~~~
 
-脚本会读取 GitHub API，并更新项目的：
-
-- 仓库地址
-- 描述
-- 项目状态
-- Star 数
-- Fork 数
-- 最近更新时间
-
-标题、技术栈和正文不会被覆盖。遇到 API 限流时，可以在本地 .env 中配置 GITHUB_TOKEN。
+`npm run sync:github` 只执行本地同步，适合预览和调试；它不会自动提交或推送。Actions
+运行时直接使用 GitHub 提供的 `GITHUB_TOKEN`，无需额外配置 token；本地若遇到 API 限流，
+可按需在 `.env` 中提供个人 `GITHUB_TOKEN`，但不要把真实 token 写进仓库。
 
 ### 4.9 QQ 音乐缓存转换工具箱
 
