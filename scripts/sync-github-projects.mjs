@@ -17,14 +17,14 @@ async function loadDotEnv() {
 }
 
 function parseFrontMatter(raw) {
-  const match = raw.match(/^---\s*\r?\n([\s\S]*?)\r?\n---\s*\r?\n?/);
+  const match = raw.match(/^---[ \t]*\r?\n([\s\S]*?)\r?\n---[ \t]*\r?\n?/);
   if (!match) return null;
   const fields = {};
   match[1].split(/\r?\n/).forEach((line) => {
     const field = line.match(/^([\w-]+):\s*(.*)$/);
     if (field) fields[field[1]] = field[2].trim();
   });
-  return { header: match[1], suffix: raw.slice(match[0].length), fields };
+  return { header: match[1], prefix: match[0], suffix: raw.slice(match[0].length), fields };
 }
 
 function replaceScalar(header, key, value) {
@@ -59,7 +59,7 @@ export function updateProjectDocument(raw, repo, now = Date.now()) {
   header = replaceScalar(header, "githubStars", String(metadata.githubStars));
   header = replaceScalar(header, "githubForks", String(metadata.githubForks));
   header = replaceScalar(header, "githubUpdated", metadata.githubUpdated);
-  return `---\n${header.trim()}\n---\n${parsed.suffix}`;
+  return parsed.prefix.replace(parsed.header, `${header.trim()}`) + parsed.suffix;
 }
 
 export async function syncProjects({ projectsDir = defaultProjectsDir, fetchImpl = fetch, env = process.env, logger = console, now = Date.now() } = {}) {

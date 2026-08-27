@@ -152,6 +152,21 @@ test("metadataForRepository maps an active repository", () => {
   });
 });
 
+test("updateProjectDocument preserves the Front Matter separator blank line and body", () => {
+  const raw = "---\nname: demo\ndescription: local\ngithubSync: true\n---\n\n正文第一行\n\n正文末行\n";
+  const repo = {
+    archived: false,
+    description: "Remote description",
+    forks_count: 2,
+    html_url: "https://github.com/acme/demo",
+    pushed_at: "2026-08-20T00:00:00Z",
+    stargazers_count: 5,
+  };
+  const updated = updateProjectDocument(raw, repo, Date.parse("2026-08-26T00:00:00Z"));
+  assert.equal(updated.slice(updated.indexOf("---", 4) + 3), "\n\n正文第一行\n\n正文末行\n");
+  assert.match(updated, /description: "Remote description"/);
+});
+
 test("updateProjectDocument preserves editorial fields and the Markdown body", () => {
   const raw = optedInProject("demo");
   const next = updateProjectDocument(raw, githubRepository("demo"), Date.parse("2026-08-26T00:00:00Z"));
