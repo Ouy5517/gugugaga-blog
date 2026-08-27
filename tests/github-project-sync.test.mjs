@@ -112,6 +112,10 @@ async function readTemporaryProjects(directory) {
   return Promise.all(["one.md", "two.md"].map((file) => fs.readFile(path.join(directory, file), "utf8")));
 }
 
+async function readSyncArtifacts(directory) {
+  return (await fs.readdir(directory)).filter((file) => file.includes(".sync-"));
+}
+
 test("extractRepository prefers the owner and repository in a GitHub URL", () => {
   assert.deepEqual(
     extractRepository({ url: "https://github.com/example/demo?tab=readme#top", name: "wrong" }, "Ouy5517"),
@@ -218,4 +222,37 @@ test("syncProjects rolls back every file when a later replacement fails", async 
     env: { GITHUB_USERNAME: "Ouy5517" },
   }), /injected replacement failure/);
   assert.deepEqual(await readTemporaryProjects(before.directory), before.files);
+  assert.deepEqual(await readSyncArtifacts(before.directory), []);
+});
+
+test("syncProjects cleans a temporary file when staging write fails", async () => {
+  const before = await snapshotTemporaryProjects();
+  let writes = 0;
+  const failingFs = {
+    ...fs,
+    writeFile: async (...args) => {
+      writes += 1;
+      await fs.writeFile(...args);
+      if (writes === 2) throw new Error("injected staging failure");
+    },
+  };
+  await assert.rejects(() => syncProjects({
+    projectsDir: before.directory,
+    fsImpl: failingFs,
+    fetchImpl: async (url) => Response.json(githubRepository(url.endsWith("/one") ? "one" : "two")),
+    env: { GITHUB_USERNAME: "Ouy5517" },
+  }), /injected staging failure/);
+  assert.deepEqual(await readTemporaryProjects(before.directory), before.files);
+  assert.deepEqual(await readSyncArtifacts(before.directory), []);
+});
+
+test("syncProjects reports actual changes and then zero changes", async () => {
+  const before = await snapshotTemporaryProjects();
+  const options = {
+    projectsDir: before.directory,
+    fetchImpl: async (url) => Response.json(githubRepository(url.endsWith("/one") ? "one" : "two")),
+    env: { GITHUB_USERNAME: "Ouy5517" },
+  };
+  assert.equal((await syncProjects(options)).changed, 2);
+  assert.equal((await syncProjects(options)).changed, 0);
 });

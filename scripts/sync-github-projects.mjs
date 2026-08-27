@@ -94,8 +94,9 @@ export async function syncProjects({ projectsDir = defaultProjectsDir, fetchImpl
   try {
     for (const [index, entry] of updates.entries()) {
       const temporaryPath = path.join(projectsDir, `.${entry.file}.sync-${process.pid}-${Date.now()}-${index}`);
+      const stagedEntry = { ...entry, temporaryPath, backupPath: `${entry.filePath}.sync-backup-${process.pid}-${Date.now()}-${index}`, backedUp: false, installed: false };
+      staged.push(stagedEntry);
       await fsImpl.writeFile(temporaryPath, entry.nextRaw, "utf8");
-      staged.push({ ...entry, temporaryPath, backupPath: `${entry.filePath}.sync-backup-${process.pid}-${Date.now()}-${index}`, backedUp: false, installed: false });
     }
   } catch (error) {
     for (const entry of staged) {
@@ -114,14 +115,35 @@ export async function syncProjects({ projectsDir = defaultProjectsDir, fetchImpl
     }
   } catch (error) {
     for (const entry of [...staged].reverse()) {
-      try {
-        if (entry.installed) await fsImpl.unlink(entry.filePath);
-        if (entry.backedUp) await fsImpl.rename(entry.backupPath, entry.filePath);
-      } catch {}
+      let restored = false;
+      if (entry.installed) {
+        try {
+          await fsImpl.unlink(entry.filePath);
+          await fsImpl.rename(entry.backupPath, entry.filePath);
+          restored = true;
+        } catch (restoreError) {
+          try {
+            await fsImpl.copyFile(entry.backupPath, entry.filePath);
+            restored = true;
+          } catch (copyError) {
+            logger.error?.(`Failed to restore ${entry.filePath} from ${entry.backupPath}: ${copyError.message}`);
+          }
+        }
+      } else if (entry.backedUp) {
+        try {
+          await fsImpl.rename(entry.backupPath, entry.filePath);
+          restored = true;
+        } catch (restoreError) {
+          logger.error?.(`Failed to restore ${entry.filePath} from ${entry.backupPath}: ${restoreError.message}`);
+        }
+      }
+      if (entry.backedUp && !restored) continue;
+      if (entry.backedUp) {
+        try { await fsImpl.unlink(entry.backupPath); } catch {}
+      }
     }
     for (const entry of staged) {
       try { await fsImpl.unlink(entry.temporaryPath); } catch {}
-      try { await fsImpl.unlink(entry.backupPath); } catch {}
     }
     throw error;
   }
