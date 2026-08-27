@@ -74,7 +74,11 @@ export async function syncProjects({ projectsDir = defaultProjectsDir, fetchImpl
     const raw = await fs.readFile(filePath, "utf8");
     const parsed = parseFrontMatter(raw);
     if (!parsed || parsed.fields.githubSync !== "true") continue;
-    const repoRef = extractRepository(parsed.fields, username);
+    entries.push({ file, filePath, raw, repoRef: extractRepository(parsed.fields, username) });
+  }
+  const fetchedEntries = [];
+  for (const entry of entries) {
+    const { file, repoRef } = entry;
     if (!repoRef) { logger.warn?.(`Skipped ${file}: missing name or GitHub URL.`); continue; }
     const response = await fetchImpl(`https://api.github.com/repos/${repoRef.owner}/${repoRef.repository}`, { headers });
     if (!response.ok) {
@@ -82,16 +86,17 @@ export async function syncProjects({ projectsDir = defaultProjectsDir, fetchImpl
       const hint = response.status === 403 ? "；可能触发了 GitHub API 限流，请配置 GITHUB_TOKEN 后重试" : "";
       throw new Error(`GitHub API ${response.status} while reading ${repoRef.owner}/${repoRef.repository}${hint}\n${detail.slice(0, 240)}`);
     }
-    entries.push({ file, filePath, raw, repo: await response.json() });
+    fetchedEntries.push({ ...entry, repo: await response.json() });
   }
+  const updates = fetchedEntries.map((entry) => ({ ...entry, nextRaw: updateProjectDocument(entry.raw, entry.repo, now) }));
   let changed = 0;
-  for (const entry of entries) {
-    const nextRaw = updateProjectDocument(entry.raw, entry.repo, now);
+  for (const entry of updates) {
+    const { nextRaw } = entry;
     if (nextRaw !== entry.raw) { await fs.writeFile(entry.filePath, nextRaw, "utf8"); changed += 1; }
     logger.log?.(`Synced ${entry.file} ← ${entry.repo.full_name || entry.repo.html_url}`);
   }
-  if (!entries.length) logger.log?.("No project has githubSync: true; add it to a project's Front Matter to opt in.");
-  return { scanned: files.length, synced: entries.length, changed };
+  if (!fetchedEntries.length) logger.log?.("No project has githubSync: true; add it to a project's Front Matter to opt in.");
+  return { scanned: files.length, synced: fetchedEntries.length, changed };
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) { await loadDotEnv(); await syncProjects(); }

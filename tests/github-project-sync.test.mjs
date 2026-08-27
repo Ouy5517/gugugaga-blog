@@ -14,6 +14,47 @@ import {
 const root = path.resolve(import.meta.dirname, "..");
 const workflowPath = path.join(root, ".github", "workflows", "sync-github-projects.yml");
 
+function githubRepository(name, overrides = {}) {
+  return {
+    archived: false,
+    description: `GitHub description for ${name}`,
+    forks_count: 2,
+    html_url: `https://github.com/Ouy5517/${name}`,
+    pushed_at: "2026-08-25T00:00:00Z",
+    stargazers_count: 3,
+    ...overrides,
+  };
+}
+
+function optedInProject(name) {
+  return `---
+name: ${name}
+title: 手工标题
+description: 本地描述
+detail: 手工项目说明
+stack:
+  - React
+url: https://github.com/Ouy5517/${name}
+status: 维护中
+featured: true
+githubSync: true
+---
+
+正文不能被覆盖。
+`;
+}
+
+async function snapshotTemporaryProjects() {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "gugu-sync-"));
+  await fs.writeFile(path.join(directory, "one.md"), optedInProject("one"));
+  await fs.writeFile(path.join(directory, "two.md"), optedInProject("two"));
+  return { directory, files: await readTemporaryProjects(directory) };
+}
+
+async function readTemporaryProjects(directory) {
+  return Promise.all(["one.md", "two.md"].map((file) => fs.readFile(path.join(directory, file), "utf8")));
+}
+
 test("extractRepository prefers the owner and repository in a GitHub URL", () => {
   assert.deepEqual(
     extractRepository({ url: "https://github.com/example/demo?tab=readme#top", name: "wrong" }, "Ouy5517"),
@@ -52,4 +93,32 @@ test("metadataForRepository maps an active repository", () => {
     githubForks: 4,
     githubUpdated: "2026-08-20",
   });
+});
+
+test("updateProjectDocument preserves editorial fields and the Markdown body", () => {
+  const raw = optedInProject("demo");
+  const next = updateProjectDocument(raw, githubRepository("demo"), Date.parse("2026-08-26T00:00:00Z"));
+  assert.match(next, /title: 手工标题/);
+  assert.match(next, /detail: 手工项目说明/);
+  assert.match(next, /- React/);
+  assert.match(next, /正文不能被覆盖。/);
+  assert.match(next, /githubStars: 3/);
+  assert.match(next, /githubForks: 2/);
+});
+
+test("updateProjectDocument preserves the local description when GitHub description is empty", () => {
+  const next = updateProjectDocument(optedInProject("demo"), githubRepository("demo", { description: "" }));
+  assert.match(next, /description: "本地描述"/);
+});
+
+test("syncProjects writes nothing when one opted-in repository API request fails", async () => {
+  const before = await snapshotTemporaryProjects();
+  await assert.rejects(() => syncProjects({
+    projectsDir: before.directory,
+    fetchImpl: async (url) => url.endsWith("/two")
+      ? new Response("missing", { status: 404 })
+      : Response.json(githubRepository("one")),
+    env: { GITHUB_USERNAME: "Ouy5517" },
+  }), /GitHub API 404.*Ouy5517\/two/);
+  assert.deepEqual(await readTemporaryProjects(before.directory), before.files);
 });
