@@ -333,5 +333,5 @@ test("syncProjects fails visibly when successful cleanup cannot remove a backup"
   const artifacts = await readSyncArtifacts(before.directory);
   assert.equal(artifacts.filter((file) => file.includes("one.md.sync-backup-")).length, 1);
   assert.equal(artifacts.filter((file) => file.includes("two.md.sync-backup-")).length, 0);
-  assert.match((await fs.readFile(path.join(before.directory, artifacts.find((file) => file.includes("one.md.sync-backup-"))), "utf8")), /正文不能被覆盖。/);
+  assert.equal(await fs.readFile(path.join(before.directory, artifacts.find((file) => file.includes("one.md.sync-backup-"))), "utf8"), before.files[0]);
 });
