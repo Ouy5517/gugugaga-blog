@@ -12,7 +12,7 @@ url: https://github.com/Ouy5517/ventriloc-local-music-converter
 status: 进行中
 featured: true
 githubSync: true
-githubStars: 0
+githubStars: 1
 githubForks: 0
 githubUpdated: 2026-08-22
 ---
