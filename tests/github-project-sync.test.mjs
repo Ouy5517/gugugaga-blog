@@ -18,6 +18,7 @@ test("defines a six-hour workflow with guarded commits", async () => {
   const workflow = YAML.parse(await fs.readFile(workflowPath, "utf8"));
   const job = workflow.jobs?.sync;
   assert.deepEqual(Object.keys(workflow.jobs ?? {}), ["sync"]);
+  assert.equal(job?.["runs-on"], "ubuntu-latest");
   assert.deepEqual(workflow.on?.schedule, [{ cron: "17 */6 * * *" }]);
   assert.equal(workflow.on?.workflow_dispatch, null);
   assert.deepEqual(job?.permissions, { contents: "write" });
@@ -35,6 +36,12 @@ test("defines a six-hour workflow with guarded commits", async () => {
   assert.match(commitStep.run, /git push origin HEAD:main/);
   assert.match(commitStep.run, /git add src\/content\/projects/);
   assert.match(commitStep.run, /github-actions\[bot\]/);
+  assert.equal(commitStep.shell, "bash");
+  const stagingCommands = commitStep.run
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.startsWith("git add "));
+  assert.deepEqual(stagingCommands, ["git add src/content/projects"]);
   for (const step of job.steps) {
     assert.equal(step["continue-on-error"], undefined);
     assert.doesNotMatch(step.run ?? "", /\|\|\s*true/);
