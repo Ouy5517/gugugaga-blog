@@ -314,3 +314,21 @@ test("syncProjects reports actual changes and then zero changes", async () => {
   assert.equal((await syncProjects(options)).changed, 2);
   assert.equal((await syncProjects(options)).changed, 0);
 });
+
+test("syncProjects fails visibly when successful cleanup cannot remove a backup", async () => {
+  const before = await snapshotTemporaryProjects();
+  const failingFs = {
+    ...fs,
+    unlink: async (target) => {
+      if (target.includes(".sync-backup-")) throw new Error("injected cleanup failure");
+      return fs.unlink(target);
+    },
+  };
+  await assert.rejects(() => syncProjects({
+    projectsDir: before.directory,
+    fsImpl: failingFs,
+    fetchImpl: async (url) => Response.json(githubRepository(url.endsWith("/one") ? "one" : "two")),
+    env: { GITHUB_USERNAME: "Ouy5517" },
+  }), (error) => error.message.includes(".sync-backup-") && error.message.includes("injected cleanup failure"));
+  assert.ok((await readSyncArtifacts(before.directory)).some((file) => file.includes(".sync-backup-")));
+});

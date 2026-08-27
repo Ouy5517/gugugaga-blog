@@ -110,6 +110,7 @@ export async function syncProjects({ projectsDir = defaultProjectsDir, fetchImpl
       entry.backedUp = true;
       await fsImpl.rename(entry.temporaryPath, entry.filePath);
       entry.installed = true;
+      entry.temporaryPath = null;
       changed += 1;
     }
   } catch (error) {
@@ -146,9 +147,22 @@ export async function syncProjects({ projectsDir = defaultProjectsDir, fetchImpl
     }
     throw error;
   }
+  const cleanupErrors = [];
   for (const entry of staged) {
-    try { await fsImpl.unlink(entry.backupPath); } catch {}
-    try { await fsImpl.unlink(entry.temporaryPath); } catch {}
+    for (const artifactPath of [entry.backupPath, entry.temporaryPath].filter(Boolean)) {
+      try {
+        await fsImpl.unlink(artifactPath);
+      } catch (cleanupError) {
+        cleanupErrors.push(`${artifactPath}: ${cleanupError.message}`);
+      }
+    }
+  }
+  if (cleanupErrors.length) {
+    const error = new Error(`GitHub sync cleanup failed:\n${cleanupErrors.join("\n")}`);
+    cleanupErrors.forEach((message) => logger.error?.(message));
+    throw error;
+  }
+  for (const entry of staged) {
     logger.log?.(`Synced ${entry.file} ← ${entry.repo.full_name || entry.repo.html_url}`);
   }
   if (!fetchedEntries.length) logger.log?.("No project has githubSync: true; add it to a project's Front Matter to opt in.");
