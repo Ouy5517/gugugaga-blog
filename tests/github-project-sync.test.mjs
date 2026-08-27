@@ -14,6 +14,19 @@ import {
 const root = path.resolve(import.meta.dirname, "..");
 const workflowPath = path.join(root, ".github", "workflows", "sync-github-projects.yml");
 
+test("defines a six-hour workflow with guarded commits", async () => {
+  const workflow = YAML.parse(await fs.readFile(workflowPath, "utf8"));
+  const job = workflow.jobs?.sync;
+  assert.deepEqual(workflow.on?.schedule, [{ cron: "17 */6 * * *" }]);
+  assert.equal(workflow.on?.workflow_dispatch, null);
+  assert.deepEqual(job?.permissions, { contents: "write" });
+  assert.equal(job?.steps?.find((step) => step.uses?.startsWith("actions/checkout@"))?.uses, "actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09");
+  assert.equal(job?.steps?.find((step) => step.uses?.startsWith("actions/setup-node@"))?.uses, "actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020");
+  const commitStep = job.steps.find((step) => step.run?.includes("git diff --quiet -- src/content/projects"));
+  assert.match(commitStep.run, /git commit -m/);
+  assert.match(commitStep.run, /git push origin HEAD:main/);
+});
+
 function githubRepository(name, overrides = {}) {
   return {
     archived: false,
