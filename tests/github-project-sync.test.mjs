@@ -246,6 +246,33 @@ test("syncProjects cleans a temporary file when staging write fails", async () =
   assert.deepEqual(await readSyncArtifacts(before.directory), []);
 });
 
+test("syncProjects keeps a backup when rollback restoration fails", async () => {
+  const before = await snapshotTemporaryProjects();
+  let replacements = 0;
+  const errors = [];
+  const failingFs = {
+    ...fs,
+    rename: async (from, to) => {
+      replacements += 1;
+      if (replacements === 4 || replacements === 5) throw new Error("injected restore failure");
+      return fs.rename(from, to);
+    },
+  };
+  await assert.rejects(() => syncProjects({
+    projectsDir: before.directory,
+    fsImpl: failingFs,
+    logger: { error: (message) => errors.push(message) },
+    fetchImpl: async (url) => Response.json(githubRepository(url.endsWith("/one") ? "one" : "two")),
+    env: { GITHUB_USERNAME: "Ouy5517" },
+  }), /injected restore failure/);
+  assert.equal(await fs.readFile(path.join(before.directory, "one.md"), "utf8"), before.files[0]);
+  const artifacts = await readSyncArtifacts(before.directory);
+  assert.equal(artifacts.filter((file) => file.includes(".sync-backup-")).length, 1);
+  assert.equal(artifacts.filter((file) => file.startsWith(".two.md.sync-")).length, 0);
+  assert.equal(await fs.readFile(path.join(before.directory, artifacts.find((file) => file.includes(".sync-backup-"))), "utf8"), before.files[1]);
+  assert.match(errors.join("\n"), /Failed to restore/);
+});
+
 test("syncProjects reports actual changes and then zero changes", async () => {
   const before = await snapshotTemporaryProjects();
   const options = {
