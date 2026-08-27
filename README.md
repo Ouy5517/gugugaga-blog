@@ -239,7 +239,7 @@ Actions 自动维护这些项目元数据：
 
 - `url`：仓库地址。
 - `description`：仓库描述；GitHub 返回空描述时保留本地已有描述。
-- `status`：根据仓库是否归档更新项目状态。
+- `status`：归档为“已归档”；未归档且最近 180 天有推送为“进行中”；否则为“维护中”。
 - `githubStars`、`githubForks`：Star 和 Fork 数。
 - `githubUpdated`：最近推送日期。
 

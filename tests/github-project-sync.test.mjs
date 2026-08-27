@@ -20,6 +20,14 @@ test("documents automatic GitHub project synchronization", async () => {
   assert.match(readme, /workflow_dispatch|手动.*同步/);
   assert.match(readme, /githubSync: true/);
   assert.match(readme, /只在.*变化.*提交|有变化.*提交/);
+  assert.match(readme, /归档.*已归档/);
+  assert.match(readme, /未归档.*180 天.*进行中/);
+  assert.match(readme, /否则.*维护中/);
+  assert.match(readme, /owner.*name|owner.*仓库/si);
+  assert.match(readme, /githubStars.*githubForks.*githubUpdated/s);
+  assert.match(readme, /空描述.*保留.*描述/);
+  assert.match(readme, /API.*失败.*零写入/s);
+  assert.match(readme, /GITHUB_TOKEN.*无需额外配置/s);
 });
 
 test("defines a six-hour workflow with guarded commits", async () => {
