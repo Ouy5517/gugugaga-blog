@@ -199,3 +199,23 @@ test("syncProjects writes nothing when one opted-in repository API request fails
   }), /GitHub API 404.*Ouy5517\/two/);
   assert.deepEqual(await readTemporaryProjects(before.directory), before.files);
 });
+
+test("syncProjects rolls back every file when a later replacement fails", async () => {
+  const before = await snapshotTemporaryProjects();
+  let replacements = 0;
+  const failingFs = {
+    ...fs,
+    rename: async (...args) => {
+      replacements += 1;
+      if (replacements === 4) throw new Error("injected replacement failure");
+      return fs.rename(...args);
+    },
+  };
+  await assert.rejects(() => syncProjects({
+    projectsDir: before.directory,
+    fsImpl: failingFs,
+    fetchImpl: async (url) => Response.json(githubRepository(url.endsWith("/one") ? "one" : "two")),
+    env: { GITHUB_USERNAME: "Ouy5517" },
+  }), /injected replacement failure/);
+  assert.deepEqual(await readTemporaryProjects(before.directory), before.files);
+});

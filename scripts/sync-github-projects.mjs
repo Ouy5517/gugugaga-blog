@@ -62,7 +62,7 @@ export function updateProjectDocument(raw, repo, now = Date.now()) {
   return parsed.prefix.replace(parsed.header, `${header.trim()}`) + parsed.suffix;
 }
 
-export async function syncProjects({ projectsDir = defaultProjectsDir, fetchImpl = fetch, env = process.env, logger = console, now = Date.now() } = {}) {
+export async function syncProjects({ projectsDir = defaultProjectsDir, fetchImpl = fetch, env = process.env, logger = console, now = Date.now(), fsImpl = fs } = {}) {
   const files = (await fs.readdir(projectsDir)).filter((file) => file.endsWith(".md"));
   const username = env.GITHUB_USERNAME || "Ouy5517";
   const token = env.GITHUB_TOKEN;
@@ -88,11 +88,46 @@ export async function syncProjects({ projectsDir = defaultProjectsDir, fetchImpl
     }
     fetchedEntries.push({ ...entry, repo: await response.json() });
   }
-  const updates = fetchedEntries.map((entry) => ({ ...entry, nextRaw: updateProjectDocument(entry.raw, entry.repo, now) }));
+  const updates = fetchedEntries.map((entry) => ({ ...entry, nextRaw: updateProjectDocument(entry.raw, entry.repo, now) }))
+    .filter((entry) => entry.nextRaw !== entry.raw);
+  const staged = [];
+  try {
+    for (const [index, entry] of updates.entries()) {
+      const temporaryPath = path.join(projectsDir, `.${entry.file}.sync-${process.pid}-${Date.now()}-${index}`);
+      await fsImpl.writeFile(temporaryPath, entry.nextRaw, "utf8");
+      staged.push({ ...entry, temporaryPath, backupPath: `${entry.filePath}.sync-backup-${process.pid}-${Date.now()}-${index}`, backedUp: false, installed: false });
+    }
+  } catch (error) {
+    for (const entry of staged) {
+      try { await fsImpl.unlink(entry.temporaryPath); } catch {}
+    }
+    throw error;
+  }
   let changed = 0;
-  for (const entry of updates) {
-    const { nextRaw } = entry;
-    if (nextRaw !== entry.raw) { await fs.writeFile(entry.filePath, nextRaw, "utf8"); changed += 1; }
+  try {
+    for (const entry of staged) {
+      await fsImpl.rename(entry.filePath, entry.backupPath);
+      entry.backedUp = true;
+      await fsImpl.rename(entry.temporaryPath, entry.filePath);
+      entry.installed = true;
+      changed += 1;
+    }
+  } catch (error) {
+    for (const entry of [...staged].reverse()) {
+      try {
+        if (entry.installed) await fsImpl.unlink(entry.filePath);
+        if (entry.backedUp) await fsImpl.rename(entry.backupPath, entry.filePath);
+      } catch {}
+    }
+    for (const entry of staged) {
+      try { await fsImpl.unlink(entry.temporaryPath); } catch {}
+      try { await fsImpl.unlink(entry.backupPath); } catch {}
+    }
+    throw error;
+  }
+  for (const entry of staged) {
+    try { await fsImpl.unlink(entry.backupPath); } catch {}
+    try { await fsImpl.unlink(entry.temporaryPath); } catch {}
     logger.log?.(`Synced ${entry.file} ← ${entry.repo.full_name || entry.repo.html_url}`);
   }
   if (!fetchedEntries.length) logger.log?.("No project has githubSync: true; add it to a project's Front Matter to opt in.");
